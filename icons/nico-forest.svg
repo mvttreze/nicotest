@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Nico robot chat-bubble mark, redrawn to match reference -->
+  <!-- Antenna stubs -->
+  <rect x="42" y="172" width="15" height="78" rx="7.5" fill="#a7e46f"/>
+  <rect x="455" y="172" width="15" height="78" rx="7.5" fill="#a7e46f"/>
+  <!-- Side ears -->
+  <path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" fill="#a7e46f"/>
+  <path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" fill="#a7e46f"/>
+  <!-- Outer head bubble -->
+  <path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" fill="#a7e46f"/>
+  <!-- Inner face -->
+  <rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/>
+  <!-- Happy closed eyes -->
+  <path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" fill="#a7e46f"/>
+  <path d="M260 258 C260 236 280 222 302 222 C324 222 344 236 344 258 C344 266 338 271 330 271 L276 271 C268 271 260 266 260 258 Z" fill="#a7e46f"/>
+  <!-- Smile -->
+  <path d="M238 296 Q256 312 274 296" fill="none" stroke="#a7e46f" stroke-width="11" stroke-linecap="round"/>
+</svg>

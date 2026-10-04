@@ -4,24 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="nico-redesign.css">
+    <link rel="stylesheet" href="style.css?v=fix4">
+    <link rel="stylesheet" href="nico-redesign.css?v=fix4">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
-    <link rel="icon" href="icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" id="nicoTouchIcon" href="icon.svg">
     <meta name="nico-api-url" content="https://nicotest-1.onrender.com">
     <meta name="supabase-url" content="https://azsdhrotjzfqhnbfnohz.supabase.co">
     <meta name="supabase-anon-key" content="sb_publishable_4dbScBcCdNfUBwPKQSm5QQ_xUK--1vK">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
 <div class="auth-screen is-visible" id="authScreen" aria-live="polite">
     <div class="auth-card">
-        <div class="auth-logo" aria-label="Nico logo">◉</div>
+        <div class="auth-logo" aria-label="Nico logo"><svg viewBox="0 0 512 512" role="img" aria-label="Nico"><rect x="42" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><rect x="455" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" style="fill:var(--accent)"/><path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" style="fill:var(--accent)"/><path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" style="fill:var(--accent)"/><rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/><path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" style="fill:var(--accent)"/><path d="M260 258 C260 236 280 222 302 222 C324 222 344 236 344 258 C344 266 338 271 330 271 L276 271 C268 271 260 266 260 258 Z" style="fill:var(--accent)"/><path d="M238 296 Q256 312 274 296" fill="none" style="stroke:var(--accent)" stroke-width="11" stroke-linecap="round"/></svg></div>
         <h1>Sign in to Nico</h1>
 
         <form id="authForm" class="auth-form" novalidate>
@@ -81,7 +82,7 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <div class="logo">
-                <span class="sparkle" id="mascotLogo">❖</span> <span id="brandName">NICO</span>
+                <span class="sparkle brand-mark" id="brandLogo"><svg viewBox="0 0 512 512" role="img" aria-label="Nico"><rect x="42" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><rect x="455" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" style="fill:var(--accent)"/><path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" style="fill:var(--accent)"/><path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" style="fill:var(--accent)"/><rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/><path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" style="fill:var(--accent)"/><path d="M260 258 C260 236 280 222 302 222 C324 222 344 236 344 258 C344 266 338 271 330 271 L276 271 C268 271 260 266 260 258 Z" style="fill:var(--accent)"/><path d="M238 296 Q256 312 274 296" fill="none" style="stroke:var(--accent)" stroke-width="11" stroke-linecap="round"/></svg></span> <span id="brandName">NICO</span>
             </div>
         </div>
 
@@ -168,7 +169,7 @@
                 <section class="settings-tab-panel" id="settings-appearance" role="tabpanel" hidden>
                     <label class="setting-row">Theme
                         <select id="themeSetting">
-                            <option value="midnight">Midnight blue</option>
+                            <option value="midnight">Default</option>
                             <option value="cyberpunk">Cyberpunk neon</option>
                             <option value="sunset">Sunset orange</option>
                             <option value="aurora">Aurora glass</option>
@@ -292,7 +293,7 @@
             </div>
             
             <div class="chat-box" id="chatBox">
-                <div id="typingIndicator" class="message assistant thinking-indicator" aria-hidden="true">Nico is thinking...</div>
+                <div id="typingIndicator" class="message assistant thinking-indicator" aria-hidden="true" style="display:none">Nico is thinking...</div>
             </div>
         </div>
 
@@ -349,7 +350,7 @@
     </main>
 </div>
 
-<script src="script.js?v=claude-ui-paste-1"></script>
+<script src="script.js?v=fix4"></script>
 <script src="nico-ui.js"></script>
 <script>
     if ("serviceWorker" in navigator) {

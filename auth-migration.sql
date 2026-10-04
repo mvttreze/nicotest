@@ -67,3 +67,9 @@ create policy "Users can delete messages in their conversations"
         and conversations.user_id = auth.uid()
     )
   );
+
+-- Persist image/file attachments on messages so old conversations reload
+-- their pictures on any device (run once in Supabase SQL Editor, then
+-- redeploy the backend).
+alter table public.messages
+  add column if not exists attachments jsonb not null default '[]'::jsonb;

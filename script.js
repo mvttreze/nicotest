@@ -85,6 +85,61 @@ function saveSettings() {
   syncDeveloperModePreference();
 }
 
+const NICO_MIDNIGHT_BLUE = "#6ea8ff";
+
+function nicoLogoInner(A, personality) {
+  const outer = `<rect x="42" y="172" width="15" height="78" rx="7.5" style="fill:${A}"/><rect x="455" y="172" width="15" height="78" rx="7.5" style="fill:${A}"/><path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" style="fill:${A}"/><path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" style="fill:${A}"/><path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" style="fill:${A}"/><rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/>`;
+  const FACES = {
+    professional: `<path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" style="fill:${A}"/><path d="M260 258 C260 236 280 222 302 222 C324 222 344 236 344 258 C344 266 338 271 330 271 L276 271 C268 271 260 266 260 258 Z" style="fill:${A}"/><path d="M238 296 Q256 312 274 296" fill="none" style="stroke:${A}" stroke-width="11" stroke-linecap="round"/>`,
+    casual: `<circle cx="210" cy="250" r="16" style="fill:${A}"/><circle cx="302" cy="250" r="16" style="fill:${A}"/><path d="M232 292 Q256 310 280 292" fill="none" style="stroke:${A}" stroke-width="11" stroke-linecap="round"/>`,
+    hype: `<path d="M186 232 L210 250 L186 268" fill="none" style="stroke:${A}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><path d="M326 232 L302 250 L326 268" fill="none" style="stroke:${A}" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="256" cy="302" rx="22" ry="26" style="fill:${A}"/>`,
+    mica: `<path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" style="fill:${A}"/><path d="M292 250 Q312 262 332 248" fill="none" style="stroke:${A}" stroke-width="11" stroke-linecap="round"/><path d="M234 294 Q256 312 278 294" fill="none" style="stroke:${A}" stroke-width="11" stroke-linecap="round"/><ellipse cx="168" cy="290" rx="16" ry="10" style="fill:${A}" opacity="0.25"/><ellipse cx="344" cy="290" rx="16" ry="10" style="fill:${A}" opacity="0.25"/>`,
+    brainrot: `<circle cx="210" cy="252" r="14" style="fill:${A}"/><circle cx="302" cy="252" r="14" style="fill:${A}"/><rect x="176" y="224" width="68" height="56" rx="16" fill="none" stroke="#10151d" stroke-width="10"/><rect x="268" y="224" width="68" height="56" rx="16" fill="none" stroke="#10151d" stroke-width="10"/><path d="M244 246 Q256 238 268 246" fill="none" stroke="#10151d" stroke-width="10" stroke-linecap="round"/><path d="M238 300 L274 295" fill="none" style="stroke:${A}" stroke-width="10" stroke-linecap="round"/>`,
+    developer: `<rect x="150" y="222" width="212" height="64" rx="32" fill="#10151d"/><rect x="190" y="246" width="44" height="12" rx="6" style="fill:${A}"/><rect x="278" y="246" width="44" height="12" rx="6" style="fill:${A}"/><path d="M228 294 L240 302 L228 310" fill="none" style="stroke:${A}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M248 310 h16" fill="none" style="stroke:${A}" stroke-width="8" stroke-linecap="round"/>`,
+  };
+  const face = FACES[personality] || FACES.professional;
+  if (personality === "mica") return `<g transform="rotate(-8 256 256)">${outer}${face}</g>`;
+  return `${outer}${face}`;
+}
+
+function nicoIconSvg(accent, personality) {
+  const c = (accent || NICO_MIDNIGHT_BLUE).trim() || NICO_MIDNIGHT_BLUE;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">${nicoLogoInner(c, personality || "professional")}</svg>`;
+}
+
+function updateNicoFaces() {
+  try {
+    const inner = nicoLogoInner("var(--accent)", settings.personality || "professional");
+    const authSvg = document.querySelector(".auth-logo svg");
+    if (authSvg) authSvg.innerHTML = inner;
+    const brandSvg = document.querySelector("#brandLogo svg");
+    if (brandSvg) brandSvg.innerHTML = inner;
+  } catch (error) {
+    console.warn("Could not update Nico faces:", error);
+  }
+}
+
+function resolveNicoAccent() {
+  const computed = getComputedStyle(document.body).getPropertyValue("--accent").trim();
+  if (computed) return computed;
+  const root = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  return root || NICO_MIDNIGHT_BLUE;
+}
+
+function updateNicoIcon() {
+  try {
+    const accent = resolveNicoAccent();
+    const url = `data:image/svg+xml,${encodeURIComponent(nicoIconSvg(accent, settings.personality))}`;
+    document.getElementById("nicoFavicon")?.setAttribute("href", url);
+    const touch = document.getElementById("nicoTouchIcon");
+    if (touch) touch.setAttribute("href", url);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.setAttribute("content", accent);
+  } catch (error) {
+    console.warn("Could not update Nico icon:", error);
+  }
+}
+
 function applySettings() {
   document.body.classList.toggle("theme-light", settings.mode === "light");
   document.body.classList.toggle(
@@ -161,6 +216,8 @@ function applySettings() {
       ? "Image active"
       : "No image selected";
   }
+  updateNicoIcon();
+  updateNicoFaces();
 }
 
 function readCustomBackground(file) {
@@ -375,11 +432,12 @@ function writeLocalConversationMessages(conversationId, messages) {
   );
 }
 
-function appendLocalConversationMessage(conversationId, role, content) {
+function appendLocalConversationMessage(conversationId, role, content, attachments = []) {
   const messages = readLocalConversationMessages(conversationId);
   messages.push({
     role,
     content,
+    attachments,
     created_at: new Date().toISOString(),
     conversation_id: conversationId,
   });
@@ -493,9 +551,10 @@ let currentConversationId = isValidConversationId(savedConversationId)
   : createConversationId();
 localStorage.setItem("active_chat_id", currentConversationId);
 
-let recognition;
+let recognition = null;
 let isListening = false;
 let silenceTimer;
+let voiceTranscript = "";
 let currentAbortController = null;
 
 // TTS Queue State & Master Toggle
@@ -503,24 +562,63 @@ let speechQueue = [];
 let isSpeaking = false;
 let ttsEnabled = false;
 
-if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+const isMobileVoice =
+  /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent || "") ||
+  (window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+
+function voiceSupported() {
+  return Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function setupVoiceRecognition() {
+  if (!voiceSupported()) return;
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SpeechRecognition();
-
-  recognition.continuous = true;
-  recognition.interimResults = true;
+  // Mobile Chrome handles single-utterance mode far better than continuous.
+  recognition.continuous = !isMobileVoice;
+  recognition.interimResults = !isMobileVoice;
+  recognition.maxAlternatives = 1;
   recognition.lang = "en-US";
 
   recognition.onstart = () => {
     isListening = true;
-    if (micBtn) micBtn.classList.add("recording");
+    voiceTranscript = "";
+    if (micBtn) {
+      micBtn.classList.add("recording");
+      micBtn.setAttribute("aria-pressed", "true");
+    }
+    showComposerToast(isMobileVoice ? "Listening… speak now" : "Listening…");
   };
 
   recognition.onend = () => {
     isListening = false;
-    if (micBtn) micBtn.classList.remove("recording");
+    clearTimeout(silenceTimer);
+    if (micBtn) {
+      micBtn.classList.remove("recording");
+      micBtn.setAttribute("aria-pressed", "false");
+    }
+    autoGrowComposer();
     if (userInput.value.trim()) sendMessage();
+  };
+
+  recognition.onerror = (event) => {
+    isListening = false;
+    clearTimeout(silenceTimer);
+    if (micBtn) {
+      micBtn.classList.remove("recording");
+      micBtn.setAttribute("aria-pressed", "false");
+    }
+    const kind = event?.error || "unknown";
+    if (kind === "not-allowed" || kind === "service-not-allowed") {
+      showComposerToast("Mic blocked — allow microphone access");
+    } else if (kind === "no-speech") {
+      showComposerToast("Didn't catch that — try again");
+    } else if (kind === "audio-capture") {
+      showComposerToast("No microphone found");
+    } else if (kind !== "aborted") {
+      showComposerToast("Voice input failed — try again");
+    }
   };
 
   recognition.onresult = (event) => {
@@ -535,29 +633,54 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
         "Nico",
       );
       userInput.value = currentTranscript;
+      voiceTranscript = currentTranscript;
+      autoGrowComposer();
 
       clearTimeout(silenceTimer);
       silenceTimer = setTimeout(() => {
-        recognition.stop();
+        try {
+          recognition.stop();
+        } catch {}
       }, 1200);
     }
   };
-} else if (micBtn) {
-  micBtn.disabled = true;
 }
 
+setupVoiceRecognition();
+
 function toggleSpeech() {
-  if (!recognition) return;
+  if (!voiceSupported() || !recognition) {
+    showComposerToast("Voice input needs Chrome or Edge");
+    return;
+  }
+  if (!window.isSecureContext) {
+    showComposerToast("Voice input needs HTTPS or localhost");
+    return;
+  }
   if (isListening) {
     clearTimeout(silenceTimer);
-    recognition.stop();
-  } else {
+    try {
+      recognition.stop();
+    } catch {}
+    return;
+  }
+  try {
     userInput.value = "";
+    voiceTranscript = "";
+    autoGrowComposer();
     recognition.start();
+  } catch (error) {
+    isListening = false;
+    if (micBtn) micBtn.classList.remove("recording");
+    showComposerToast("Voice input failed — try again");
   }
 }
 
 if (micBtn) {
+  if (!voiceSupported()) {
+    micBtn.title = "Voice input needs Chrome or Edge";
+    micBtn.setAttribute("aria-label", "Voice input (needs Chrome or Edge)");
+  }
   micBtn.onclick = toggleSpeech;
 }
 
@@ -596,11 +719,12 @@ function renderAttachments() {
   attachmentList.innerHTML = "";
   attachmentList.classList.toggle("has-items", selectedAttachments.length > 0);
   selectedAttachments.forEach((attachment, index) => {
+    const isImage = isImageFile(attachment.file);
     const chip = document.createElement("div");
     chip.className = "attachment-chip";
-    if (attachment.kind === "images") chip.classList.add("is-image");
+    if (isImage) chip.classList.add("is-image");
 
-    if (attachment.kind === "images" && attachment.previewUrl) {
+    if (isImage && attachment.previewUrl) {
       const preview = document.createElement("img");
       preview.className = "attachment-thumb";
       preview.src = attachment.previewUrl;
@@ -648,10 +772,23 @@ function selectFiles(kind) {
   addBtn?.setAttribute("aria-expanded", "false");
 }
 
+function isImageFile(file) {
+  const mime = (file?.type || "").toLowerCase();
+  if (mime.startsWith("image/")) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|heic|heif)$/i.test(file?.name || "");
+}
+
 function addSelectedFiles(kind, event) {
-  const icon = kind === "images" ? "🖼️" : kind === "code" ? "⌘" : "📄";
+  const files = Array.from(event.target.files || []);
+  event.target.value = "";
+  if (files.length === 0) return;
+  // Images go through the shared pipeline (HEIC conversion, previews).
+  const images = files.filter((file) => isImageFile(file));
+  const others = files.filter((file) => !isImageFile(file));
+  if (images.length) addImageAttachments(images);
+  const icon = kind === "code" ? "⌘" : "📄";
   let added = 0;
-  Array.from(event.target.files || []).forEach((file) => {
+  others.forEach((file) => {
     if (selectedAttachments.length >= 10) return;
     if (
       !selectedAttachments.some(
@@ -660,18 +797,12 @@ function addSelectedFiles(kind, event) {
           attachment.file.size === file.size,
       )
     ) {
-      selectedAttachments.push({
-        file,
-        kind,
-        icon,
-        previewUrl: kind === "images" ? URL.createObjectURL(file) : null,
-      });
+      selectedAttachments.push({ file, kind, icon, previewUrl: null });
       added += 1;
     }
   });
-  event.target.value = "";
-  renderAttachments();
-  if (added > 0) showComposerToast(added === 1 ? "File attached" : `${added} files attached`);
+  if (others.length) renderAttachments();
+  if (added > 0 && images.length === 0) showComposerToast(added === 1 ? "File attached" : `${added} files attached`);
 }
 
 function getPastedImageExtension(mimeType) {
@@ -694,22 +825,69 @@ function autoGrowComposer() {
   userInput.style.height = Math.min(userInput.scrollHeight, 160) + "px";
 }
 
-function addImageAttachments(imageFiles) {
+function isHeicFile(file) {
+  const mime = (file?.type || "").toLowerCase();
+  if (
+    mime === "image/heic" ||
+    mime === "image/heif" ||
+    mime === "image/heic-sequence" ||
+    mime === "image/heif-sequence"
+  ) {
+    return true;
+  }
+  return /\.(heic|heif)$/i.test(file?.name || "");
+}
+
+async function convertHeicToJpeg(file) {
+  if (!window.heic2any) return null;
+  try {
+    const out = await window.heic2any({
+      blob: file,
+      toType: "image/jpeg",
+      quality: 0.85,
+    });
+    const blob = Array.isArray(out) ? out[0] : out;
+    if (!blob) return null;
+    const base = (file.name || "photo").replace(/\.(heic|heif)$/i, "") || "photo";
+    return new File([blob], `${base}.jpg`, {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.warn("HEIC conversion failed:", error);
+    return null;
+  }
+}
+
+async function addImageAttachments(imageFiles) {
   let added = 0;
-  imageFiles.forEach((file, index) => {
-    if (!file) return;
+  let index = 0;
+  for (let file of imageFiles) {
+    index += 1;
+    if (!file) continue;
     if (selectedAttachments.length >= 10) {
       showComposerToast("Max 10 attachments");
-      return;
+      break;
     }
     if (file.size && file.size > 12 * 1024 * 1024) {
       showComposerToast(`${file.name || "Image"} is too large (12MB max)`);
-      return;
+      continue;
+    }
+    // iPhone photos arrive as HEIC, which browsers can't preview and vision
+    // APIs often reject — convert to JPEG so preview and analysis both work.
+    if (isHeicFile(file)) {
+      showComposerToast("Converting iPhone photo…");
+      const converted = await convertHeicToJpeg(file);
+      if (converted) {
+        file = converted;
+      } else {
+        showComposerToast("Couldn't convert — sending original");
+      }
     }
     const extension = getPastedImageExtension(file.type);
     const baseName = (file.name && !file.name.startsWith("image.") && !file.name.startsWith("blob"))
       ? file.name
-      : `pasted-image-${Date.now()}-${index + 1}.${extension}`;
+      : `pasted-image-${Date.now()}-${index}.${extension}`;
     const pastedFile = file instanceof File
       ? file
       : new File([file], baseName, {
@@ -724,7 +902,7 @@ function addImageAttachments(imageFiles) {
       previewUrl: URL.createObjectURL(pastedFile),
     });
     added += 1;
-  });
+  }
 
   renderAttachments();
   autoGrowComposer();
@@ -870,18 +1048,58 @@ Object.entries(filePickers).forEach(([kind, picker]) => {
   picker?.addEventListener("change", (event) => addSelectedFiles(kind, event));
 });
 
+function readImageDataUrl(file, maxDim = 1568, quality = 0.85) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const tooBig =
+          image.width > maxDim ||
+          image.height > maxDim ||
+          (file.size || 0) > 1500 * 1024;
+        // Keep GIFs untouched so animation survives.
+        if (!tooBig || (file.type || "").toLowerCase() === "image/gif") {
+          URL.revokeObjectURL(url);
+          readFileAsDataUrl(file).then(resolve);
+          return;
+        }
+        const scale = Math.min(1, maxDim / image.width, maxDim / image.height);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve({ dataUrl: canvas.toDataURL("image/jpeg", quality), converted: true });
+      } catch {
+        URL.revokeObjectURL(url);
+        readFileAsDataUrl(file).then((dataUrl) => resolve({ dataUrl, converted: false }));
+      }
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      readFileAsDataUrl(file).then((dataUrl) => resolve({ dataUrl, converted: false }));
+    };
+    image.src = url;
+  });
+}
+
 async function buildMessageWithAttachments(message) {
   if (selectedAttachments.length === 0) {
-    return { message, displayMessage: message, attachments: [] };
+    return { message, displayMessage: message, attachments: [], failed: false };
   }
   const attachmentContext = [];
   const attachments = [];
   for (const attachment of selectedAttachments) {
-    if (attachment.kind === "images") {
-      const dataUrl = await readFileAsDataUrl(attachment.file);
+    // Any image counts as an image no matter which picker added it, so a
+    // JPG via "Upload files" never degrades to an "[Attached binary file]" note.
+    if (isImageFile(attachment.file)) {
+      const { dataUrl, converted } = await readImageDataUrl(attachment.file);
       attachments.push({
         name: attachment.file.name,
-        mime_type: attachment.file.type || "image/*",
+        mime_type: converted
+          ? "image/jpeg"
+          : attachment.file.type || "image/*",
         data_url: dataUrl,
       });
       continue;
@@ -913,10 +1131,15 @@ async function buildMessageWithAttachments(message) {
     });
     attachmentContext.push(`[Attached binary file: ${attachment.file.name}]`);
   }
+  const failed =
+    selectedAttachments.length > 0 &&
+    attachments.length === 0 &&
+    attachmentContext.length === 0;
   return {
     message: `${message}\n\n${attachmentContext.join("\n\n")}`.trim(),
     displayMessage: message,
     attachments,
+    failed,
   };
 }
 
@@ -1014,6 +1237,9 @@ function ensureTypingIndicator() {
     chatBox.appendChild(indicator);
   }
   indicator.innerText = getAssistantThinkingLabel();
+  // The bubble may only ever show during a live send (setResponsePhase
+  // "thinking"). History renders, refreshes and chat switches keep it hidden.
+  setThinkingIndicator(indicator, false);
 }
 
 function setThinkingIndicator(indicator, visible) {
@@ -1409,6 +1635,7 @@ function appendMessage(role, text, attachments = []) {
 
   const msgDiv = document.createElement("div");
   msgDiv.className = `message ${role}`;
+  let footerText = text;
 
   if (role === "assistant") {
     msgDiv.innerHTML = `<span class="avatar-tag"></span><div class="content">${renderMarkdown(text)}</div>`;
@@ -1418,20 +1645,47 @@ function appendMessage(role, text, attachments = []) {
     const content = document.createElement("div");
     content.className = "content";
     content.textContent = text;
-    attachments
-      .filter((attachment) => attachment.mime_type.startsWith("image/"))
-      .forEach((attachment) => {
-        const image = document.createElement("img");
-        image.className = "message-image-preview";
-        image.src = attachment.data_url;
-        image.alt = attachment.name || "Attached image";
-        image.loading = "lazy";
-        content.appendChild(image);
-      });
+    const renderedImages = attachments.filter((attachment) =>
+      (attachment.mime_type || "").startsWith("image/"),
+    );
+    renderedImages.forEach((attachment) => {
+      const image = document.createElement("img");
+      image.className = "message-image-preview";
+      image.src = attachment.data_url;
+      image.alt = attachment.name || "Attached image";
+      image.loading = "lazy";
+      // Never show a raw-filename box: unreadable bytes (e.g. HEIC photos
+      // browsers can't decode) become a labeled placeholder instead.
+      image.onerror = () => {
+        const note = document.createElement("div");
+        note.className = "message-image-unavailable";
+        note.textContent = `🖼 ${attachment.name || "Attached image"} (preview unavailable — Nico still received the file)`;
+        image.replaceWith(note);
+      };
+      content.appendChild(image);
+    });
+    // Heal old messages saved as "[Attached binary file: photo.jpg]" when the
+    // image itself is available: drop the stale marker line for each rendered
+    // image so history shows the picture instead of the placeholder text.
+    if (renderedImages.length > 0) {
+      const names = new Set(
+        renderedImages.map((attachment) => attachment.name).filter(Boolean),
+      );
+      const cleaned = String(content.firstChild?.textContent ?? text)
+        .split("\n")
+        .filter((line) => {
+          const marker = line.match(/^\[Attached binary file:\s*(.+?)\]$/);
+          return !marker || !names.has(marker[1].trim());
+        })
+        .join("\n")
+        .trim();
+      if (content.firstChild) content.firstChild.textContent = cleaned;
+      footerText = cleaned;
+    }
     msgDiv.appendChild(content);
   }
 
-  attachMessageFooter(msgDiv, role, text);
+  attachMessageFooter(msgDiv, role, footerText);
 
   ensureTypingIndicator();
   const indicator = document.getElementById("typingIndicator");
@@ -1556,17 +1810,71 @@ function setPinnedConversation(id, pinned) {
 
 function closeConversationMenus() {
   document.querySelectorAll(".conversation-menu.is-open").forEach((menu) => {
-    menu.classList.remove("is-open");
+    menu.classList.remove("is-open", "fixed");
     menu.hidden = true;
-    menu.previousElementSibling?.setAttribute("aria-expanded", "false");
+    menu.style.left = "";
+    menu.style.top = "";
+    menu.style.visibility = "";
+    menu._trigger?.setAttribute("aria-expanded", "false");
+    // Drop stale menus whose conversation row was re-rendered away.
+    if (menu._home && !menu._home.isConnected) {
+      menu.remove();
+    } else if (menu._home && menu.parentElement !== menu._home) {
+      menu._home.appendChild(menu);
+    }
   });
 }
 
+function openConversationMenu(menu, trigger) {
+  closeConversationMenus();
+  menu._home = menu._home || trigger.parentElement;
+  menu._trigger = trigger;
+  // Render in <body> with viewport-fixed coords so the sidebar's
+  // overflow-x clipping can never trap it underneath.
+  document.body.appendChild(menu);
+  menu.hidden = false;
+  menu.classList.add("is-open", "fixed");
+  menu.style.visibility = "hidden";
+  const rect = trigger.getBoundingClientRect();
+  const w = menu.offsetWidth || 200;
+  const h = menu.offsetHeight || 170;
+  let left = rect.right - w;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  let top = rect.bottom + 6;
+  if (top + h > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - h - 6);
+  }
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.visibility = "";
+  trigger.setAttribute("aria-expanded", "true");
+}
+
 document.addEventListener("click", (event) => {
-  if (!event.target.closest(".conversation-actions")) {
+  if (
+    !event.target.closest(".conversation-actions") &&
+    !event.target.closest(".conversation-menu")
+  ) {
     closeConversationMenus();
   }
 });
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeConversationMenus();
+});
+
+document.addEventListener(
+  "scroll",
+  (event) => {
+    if (event.target.closest && event.target.closest(".conversation-menu")) {
+      return;
+    }
+    closeConversationMenus();
+  },
+  true,
+);
+
+window.addEventListener("resize", closeConversationMenus);
 
 async function shareConversation(id, title) {
   const shareUrl = `${window.location.href.split("#")[0]}#chat=${encodeURIComponent(id)}`;
@@ -1637,11 +1945,11 @@ function createConversationMenu(item, conversation) {
 
   trigger.addEventListener("click", (event) => {
     event.stopPropagation();
-    const shouldOpen = !menu.classList.contains("is-open");
-    closeConversationMenus();
-    menu.classList.toggle("is-open", shouldOpen);
-    menu.hidden = !shouldOpen;
-    trigger.setAttribute("aria-expanded", String(shouldOpen));
+    if (menu.classList.contains("is-open")) {
+      closeConversationMenus();
+    } else {
+      openConversationMenu(menu, trigger);
+    }
   });
   actions.addEventListener("click", (event) => event.stopPropagation());
   actions.append(trigger, menu);
@@ -1756,7 +2064,7 @@ async function loadMessages() {
       clearChatBox();
       if (Array.isArray(data)) {
         data.forEach((msg) => {
-          appendMessage(msg.role, msg.content, []);
+          appendMessage(msg.role, msg.content, msg.attachments || []);
         });
       }
       return;
@@ -1777,13 +2085,17 @@ async function loadMessages() {
     }
     clearChatBox();
     if (Array.isArray(data)) {
+      // Server-saved attachments win; the localStorage cache is only a
+      // fallback for messages written before the backend stored them.
       const storedAttachments = loadConversationAttachments();
       let userMessageIndex = 0;
       data.forEach((msg) => {
-        const attachments =
-          msg.role === "user"
-            ? storedAttachments[userMessageIndex++] || []
-            : [];
+        let attachments = [];
+        if (Array.isArray(msg.attachments)) {
+          attachments = msg.attachments;
+        } else if (msg.role === "user") {
+          attachments = storedAttachments[userMessageIndex++] || [];
+        }
         appendMessage(msg.role, msg.content, attachments);
       });
     }
@@ -1838,6 +2150,12 @@ async function sendMessage() {
   const typedMessage = userInput.value.trim();
   if (!typedMessage && selectedAttachments.length === 0) return;
   const attachmentRequest = await buildMessageWithAttachments(typedMessage);
+  // Never silently drop the files: if nothing usable could be read, stop
+  // here instead of sending a text-only message Nico will misread.
+  if (attachmentRequest.failed) {
+    showComposerToast("Couldn't read the attached file — try JPG or PNG");
+    return;
+  }
   const message = attachmentRequest.message;
   const displayMessage = attachmentRequest.displayMessage;
 
@@ -1868,6 +2186,7 @@ async function sendMessage() {
         currentConversationId,
         "user",
         displayMessage,
+        attachmentRequest.attachments,
       );
     }
   }
@@ -2019,8 +2338,12 @@ async function sendMessage() {
     indicator?.remove();
     if (error.name === "AbortError") {
       contentDiv.innerHTML += " <i>[Generation stopped]</i>";
+      contentDiv.style.visibility = "visible";
+      attachMessageFooter(assistantMsgDiv, "assistant", contentDiv.innerText || "[Generation stopped]");
     } else {
       contentDiv.innerText = `Error: ${error.message || "Could not connect to Nico backend."}`;
+      contentDiv.style.visibility = "visible";
+      attachMessageFooter(assistantMsgDiv, "assistant", contentDiv.innerText);
     }
   } finally {
     currentAbortController = null;
@@ -2141,7 +2464,7 @@ function handleCommand(commandText) {
 }
 
 function exportChat() {
-  const messages = Array.from(chatBox.querySelectorAll(".message")).map(
+  const messages = Array.from(chatBox.querySelectorAll(".message:not(.thinking-indicator)")).map(
     (msg) => {
       const isUser = msg.classList.contains("user");
       const role = isUser ? "User" : "Nico";
@@ -2173,7 +2496,7 @@ function downloadFile(filename, content, type) {
 }
 
 function exportChatJson() {
-  const messages = Array.from(chatBox.querySelectorAll(".message")).map(
+  const messages = Array.from(chatBox.querySelectorAll(".message:not(.thinking-indicator)")).map(
     (msg) => ({
       role: msg.classList.contains("user") ? "user" : "assistant",
       content: msg.querySelector(".content")?.innerText || "",

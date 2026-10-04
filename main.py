@@ -719,6 +719,40 @@ def delete_conversation(
   return {"status": "success"}
 
 
+def insert_message(payload: dict):
+  try:
+    supabase_client.table("messages").insert(payload).execute()
+  except Exception as error:
+    # Pre-migration databases have no attachments column yet.
+    if "attachments" in payload and "attachments" in str(error).lower():
+      fallback = {
+        key: value for key, value in payload.items() if key != "attachments"
+      }
+      supabase_client.table("messages").insert(fallback).execute()
+    else:
+      raise
+
+
+def fetch_messages(conversation_id: str):
+  for columns in ("role, content, attachments", "role, content"):
+    try:
+      response = (
+          supabase_client.table("messages")
+          .select(columns)
+          .eq("conversation_id", conversation_id)
+          .order("created_at")
+          .execute()
+      )
+    except Exception:
+      continue
+    rows = response.data or []
+    if columns == "role, content":
+      for row in rows:
+        row["attachments"] = []
+    return rows
+  raise HTTPException(status_code=503, detail="Could not load messages")
+
+
 @app.get("/messages/{conversation_id}")
 def get_messages(
     conversation_id: str,
@@ -731,14 +765,7 @@ def get_messages(
 
   require_supabase()
   get_owned_conversation(conversation_id, user.id)
-  response = (
-      supabase_client.table("messages")
-      .select("role, content")
-      .eq("conversation_id", conversation_id)
-      .order("created_at")
-      .execute()
-  )
-  return response.data
+  return fetch_messages(conversation_id)
 
 
 @app.post("/chat/stream")
@@ -778,6 +805,7 @@ async def chat_stream(
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,
+          "attachments": request.attachments,
       })
     else:
       conv_check = (
@@ -805,24 +833,21 @@ async def chat_stream(
           "user_id": user.id,
         }).execute()
 
-      history_response = (
-          supabase_client.table("messages")
-          .select("role, content")
-          .eq("conversation_id", request.conversation_id)
-          .order("created_at")
-          .execute()
-      )
+      history_response = fetch_messages(request.conversation_id)
       past_messages = (
-          history_response.data
+          history_response
           if request.settings.get("context", True)
           else []
       )
 
-      supabase_client.table("messages").insert({
+      user_payload = {
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,
-      }).execute()
+      }
+      if request.attachments:
+        user_payload["attachments"] = request.attachments
+      insert_message(user_payload)
   else:
     past_messages = []
 
