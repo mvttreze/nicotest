@@ -1,12 +1,6 @@
 const { app, BrowserWindow, Menu } = require("electron");
 const path = require("path");
 
-const backendCandidates = [
-  process.env.NICO_URL,
-  "http://127.0.0.1:8000",
-  "http://localhost:8000",
-].filter(Boolean);
-
 const localIndex = path.resolve(__dirname, "..", "index.html");
 const appIcon = path.resolve(__dirname, "..", "icon.svg");
 
@@ -33,13 +27,14 @@ function buildMenu() {
 }
 
 async function loadNico(win) {
-  for (const url of backendCandidates) {
+  const frontendUrl = process.env.NICO_URL;
+  if (frontendUrl) {
     try {
-      await win.loadURL(url);
-      console.log(`Loaded Nico from ${url}`);
+      await win.loadURL(frontendUrl);
+      console.log(`Loaded Nico from ${frontendUrl}`);
       return;
     } catch (error) {
-      console.warn(`Could not load ${url}:`, error.message);
+      console.warn(`Could not load ${frontendUrl}:`, error.message);
     }
   }
 
@@ -60,14 +55,10 @@ function createWindow() {
     titleBarStyle: "hiddenInset",
     show: false,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
     },
-  });
-
-  win.webContents.on("did-fail-load", async () => {
-    console.warn("Page failed to load; falling back to local app shell.");
-    await win.loadFile(localIndex);
   });
 
   win.once("ready-to-show", () => {

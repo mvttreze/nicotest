@@ -1941,14 +1941,6 @@ function finishDemoSignIn(username, token = null) {
   updateAuthUi(demoUser);
 }
 
-function isReservedDeveloperCredentials(value, password) {
-  const normalized = (value || "").trim().toLowerCase();
-  return (
-    (normalized === "admin" || normalized === "admin@nico.local") &&
-    String(password || "") === "nicodeveloping"
-  );
-}
-
 function isDeveloperAccountUser(user) {
   if (!user) return false;
   const email = (user.email || "").toLowerCase();
@@ -2067,11 +2059,24 @@ async function submitDemoAuth(action = "login", username, password) {
 
   const demoUser = payload.user || {};
   const token = payload.token || null;
-  if (token) {
-    localStorage.setItem("nico_demo_auth_token", token);
-    localStorage.setItem("nico_demo_user", JSON.stringify(demoUser));
+  const refreshToken = payload.refresh_token || null;
+  if (token && refreshToken && authClient) {
+    localStorage.removeItem("nico_demo_auth_token");
+    localStorage.removeItem("nico_demo_user");
+    const { data, error } = await authClient.auth.setSession({
+      access_token: token,
+      refresh_token: refreshToken,
+    });
+    if (error)
+      throw new Error(error.message || "Could not restore sign-in session");
+    updateAuthUi(data.session?.user || demoUser);
+  } else {
+    if (token) {
+      localStorage.setItem("nico_demo_auth_token", token);
+      localStorage.setItem("nico_demo_user", JSON.stringify(demoUser));
+    }
+    updateAuthUi(demoUser);
   }
-  updateAuthUi(demoUser);
   return demoUser;
 }
 
@@ -2129,51 +2134,13 @@ function initializeAuthScreen() {
       return;
     }
 
-    const reservedDeveloperLogin = isReservedDeveloperCredentials(
-      value,
-      password,
-    );
-
     try {
       if (submitButton) submitButton.disabled = true;
       submitButton.textContent =
         authMode === "signup" ? "Creating account..." : "Signing in...";
 
-      if (reservedDeveloperLogin) {
-        await submitDemoAuth("login", "admin", "nicodeveloping");
-        form.reset();
-        return;
-      }
-
-      if (authClient) {
-        const email = value.includes("@") ? value : `${value}@nico.local`;
-        const result =
-          authMode === "signup"
-            ? await authClient.auth.signUp({
-                email,
-                password,
-                options: {
-                  data: {
-                    full_name: value.split("@", 1)[0] || "User",
-                    name: value.split("@", 1)[0] || "User",
-                  },
-                },
-              })
-            : await authClient.auth.signInWithPassword({ email, password });
-
-        if (result.error) {
-          throw new Error(result.error.message || "Authentication failed");
-        }
-
-        const user = result.data?.user || result.data?.session?.user || null;
-        if (user) {
-          updateAuthUi(user);
-          form.reset();
-        }
-      } else {
-        await submitDemoAuth(authMode, value, password);
-        form.reset();
-      }
+      await submitDemoAuth(authMode, value, password);
+      form.reset();
     } catch (error) {
       alert(error.message || "Authentication failed");
     } finally {

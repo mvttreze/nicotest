@@ -18,14 +18,16 @@ GROQ_API_KEY=your-groq-key
 GEMINI_API_KEY=your-gemini-key
 ADMIN_LOGIN=admin
 ADMIN_EMAIL=your-real-supabase-email@example.com
-ADMIN_PASSWORD=nicodeveloping
+ADMIN_PASSWORD=replace-with-a-unique-secret
+ALLOW_DEMO_AUTH=false
 ALLOWED_ORIGINS=https://your-frontend.onrender.com,https://your-custom-domain.example
 ```
 
 `admin` remains the username entered in Nico. The backend maps it to
 `ADMIN_EMAIL` and authenticates through Supabase, returning a persistent
 Supabase session. The local fallback is intended only for development and
-tests; set all production variables in Render.
+tests. Keep `ALLOW_DEMO_AUTH=false` in production and configure all admin and
+provider secrets in Render.
 
 In the static frontend, set the `nico-api-url`, Supabase URL, and publishable
 key values in `index.html` to the deployed backend/project values. Configure

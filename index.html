@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="nico-redesign.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
-    <meta name="nico-api-url" content="https://nicotest-1.onrender.com">
+    <meta name="nico-api-url" content="https://nico-backend.onrender.com">
     <meta name="supabase-url" content="https://azsdhrotjzfqhnbfnohz.supabase.co">
     <meta name="supabase-anon-key" content="sb_publishable_4dbScBcCdNfUBwPKQSm5QQ_xUK--1vK">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -282,6 +283,12 @@
             <div id="welcomeScreen" class="welcome-container">
                 <h1 class="welcome-title">Hello, <span id="welcomeName">User</span></h1>
                 <p class="welcome-subtitle">What should we focus on?</p>
+                <div class="welcome-suggestions">
+                    <button type="button" data-prompt="Help me debug this code: ">Debug some code</button>
+                    <button type="button" data-prompt="Explain this simply: ">Explain something</button>
+                    <button type="button" data-prompt="Help me plan my day: ">Plan my day</button>
+                    <button type="button" data-prompt="Write a message to ">Draft a message</button>
+                </div>
             </div>
             
             <div class="chat-box" id="chatBox">
@@ -291,11 +298,12 @@
 
         <!-- Floating Glass Input Bar -->
         <div class="input-wrapper">
+            <div class="mode-chips" id="modeChips" aria-label="Quick modes"></div>
             <div class="input-pill">
                 <button id="addBtn" class="icon-btn add-btn" type="button" aria-label="Open tools" aria-expanded="false" aria-controls="addFilesDropdown" title="Open tools">+</button>
                 <input type="text" id="userInput" placeholder="Ask Nico...">
                 <div class="input-actions">
-                    <button id="micBtn" class="icon-btn" type="button" title="Voice Input">🎤</button>
+                    <button id="micBtn" class="icon-btn" type="button" title="Voice Input"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
                     <button id="sendBtn" class="send-btn" type="button">Send</button>
                 </div>
             </div>
@@ -329,6 +337,7 @@
 </div>
 
 <script src="script.js?v=clipboard-paste-2"></script>
+<script src="nico-ui.js"></script>
 <script>
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js");

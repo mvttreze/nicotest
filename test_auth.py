@@ -1,10 +1,28 @@
 import uuid
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 import main
 from main import app
+
+TEST_ADMIN_PASSWORD = "local-test-password"
+
+
+@pytest.fixture(autouse=True)
+def isolate_auth_state(monkeypatch):
+    monkeypatch.setattr(main, "supabase_client", None)
+    monkeypatch.setattr(main, "ALLOW_DEMO_AUTH", True)
+    monkeypatch.setattr(main, "ADMIN_LOGIN", "admin")
+    monkeypatch.setattr(main, "ADMIN_EMAIL", "admin@nico.local")
+    monkeypatch.setattr(main, "ADMIN_EMAILS", {"admin@nico.local"})
+    monkeypatch.setitem(main.DEVELOPER_ACCOUNT, "email", "admin@nico.local")
+    monkeypatch.setitem(main.DEVELOPER_ACCOUNT, "password", TEST_ADMIN_PASSWORD)
+    main.DEMO_USERS.clear()
+    main.DEMO_SESSIONS.clear()
+    main.DEMO_CONVERSATIONS.clear()
+    main.DEMO_MESSAGES.clear()
 
 
 def test_auth_routes_work_in_demo_mode_without_supabase():
@@ -30,7 +48,7 @@ def test_reserved_developer_login_opens_admin_account():
 
     response = client.post(
         "/auth/login",
-        json={"username_or_email": "admin", "password": "nicodeveloping"},
+        json={"username_or_email": "admin", "password": TEST_ADMIN_PASSWORD},
     )
 
     assert response.status_code == 200
@@ -66,12 +84,97 @@ def test_admin_dashboard_requires_admin_access():
     assert overview_response.json()["detail"] == "Admin access required"
 
 
+def test_user_metadata_role_does_not_grant_admin_access(monkeypatch):
+    monkeypatch.setattr(
+        main,
+        "get_current_user",
+        lambda authorization: SimpleNamespace(
+            id="ordinary-user",
+            email="ordinary@example.com",
+            user_metadata={"role": "developer"},
+        ),
+    )
+
+    response = TestClient(app).get(
+        "/admin/logs",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_failed_supabase_login_does_not_create_demo_admin(monkeypatch):
+    class _FailedAuth:
+        def sign_in_with_password(self, credentials):
+            raise RuntimeError("Supabase is unavailable")
+
+    monkeypatch.setattr(main, "supabase_client", SimpleNamespace(auth=_FailedAuth()))
+    monkeypatch.setattr(main, "ALLOW_DEMO_AUTH", False)
+
+    response = TestClient(app).post(
+        "/auth/login",
+        json={"username_or_email": "admin", "password": TEST_ADMIN_PASSWORD},
+    )
+
+    assert response.status_code == 401
+    assert "admin@nico.local" not in main.DEMO_USERS
+
+
+def test_demo_messages_are_scoped_to_their_owner(monkeypatch):
+    conversation_id = str(uuid.uuid4())
+    alice_id = "demo-alice"
+    bob_id = "demo-bob"
+    alice_token = "demo-token-alice"
+    bob_token = "demo-token-bob"
+
+    monkeypatch.setitem(
+        main.DEMO_USERS,
+        "alice@nico.local",
+        {"id": alice_id, "email": "alice@nico.local", "user_metadata": {}},
+    )
+    monkeypatch.setitem(
+        main.DEMO_USERS,
+        "bob@nico.local",
+        {"id": bob_id, "email": "bob@nico.local", "user_metadata": {}},
+    )
+    monkeypatch.setitem(main.DEMO_SESSIONS, alice_token, alice_id)
+    monkeypatch.setitem(main.DEMO_SESSIONS, bob_token, bob_id)
+    monkeypatch.setitem(
+        main.DEMO_CONVERSATIONS,
+        alice_id,
+        {conversation_id: {"id": conversation_id, "title": "Alice chat"}},
+    )
+    monkeypatch.setitem(
+        main.DEMO_CONVERSATIONS,
+        bob_id,
+        {conversation_id: {"id": conversation_id, "title": "Bob chat"}},
+    )
+    monkeypatch.setitem(
+        main.DEMO_MESSAGES,
+        alice_id,
+        {conversation_id: [{"role": "user", "content": "Alice private text"}]},
+    )
+    monkeypatch.setitem(
+        main.DEMO_MESSAGES,
+        bob_id,
+        {conversation_id: [{"role": "user", "content": "Bob's message"}]},
+    )
+
+    response = TestClient(app).get(
+        f"/messages/{conversation_id}",
+        headers={"Authorization": f"Bearer {bob_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [{"role": "user", "content": "Bob's message"}]
+
+
 def test_reserved_developer_account_has_maintainer_identity():
     client = TestClient(app)
 
     response = client.post(
         "/auth/login",
-        json={"username_or_email": "admin", "password": "nicodeveloping"},
+        json={"username_or_email": "admin", "password": TEST_ADMIN_PASSWORD},
     )
 
     assert response.status_code == 200
@@ -86,7 +189,7 @@ def test_reserved_developer_identity_override_beats_memory(monkeypatch):
 
     login_response = client.post(
         "/auth/login",
-        json={"username_or_email": "admin", "password": "nicodeveloping"},
+        json={"username_or_email": "admin", "password": TEST_ADMIN_PASSWORD},
     )
     token = login_response.json()["token"]
 
@@ -147,7 +250,7 @@ def test_admin_identity_answer_tracks_active_personality(monkeypatch):
 
     login_response = client.post(
         "/auth/login",
-        json={"username_or_email": "admin", "password": "nicodeveloping"},
+        json={"username_or_email": "admin", "password": TEST_ADMIN_PASSWORD},
     )
     token = login_response.json()["token"]
 
@@ -209,7 +312,7 @@ def test_ai_identity_uses_active_personality(monkeypatch):
 
     login_response = client.post(
         "/auth/login",
-        json={"username_or_email": "admin", "password": "nicodeveloping"},
+        json={"username_or_email": "admin", "password": TEST_ADMIN_PASSWORD},
     )
     token = login_response.json()["token"]
 

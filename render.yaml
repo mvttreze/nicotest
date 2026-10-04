@@ -23,12 +23,22 @@ services:
         sync: false
       - key: GEMINI_VISION_MODEL
         value: gemini-3.1-flash-lite
+      - key: ADMIN_LOGIN
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: ALLOW_DEMO_AUTH
+        value: "false"
       - key: ALLOWED_ORIGINS
-        value: https://nico-ai-assistant.onrender.com
+        value: https://nico-ai.onrender.com
 
   # Static frontend. Do not use Python/gunicorn for this URL.
   - type: web
     name: nico-ai
     runtime: static
-    buildCommand: mkdir -p public && cp index.html style.css script.js manifest.json sw.js icon.svg public/
+    buildCommand: mkdir -p public && cp index.html style.css nico-redesign.css nico-ui.js script.js manifest.json sw.js icon.svg public/
     staticPublishPath: ./public

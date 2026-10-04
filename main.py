@@ -34,8 +34,12 @@ ALLOWED_ORIGINS = [
   if value.strip()
 ]
 ADMIN_LOGIN = (os.getenv("ADMIN_LOGIN") or "admin").strip().lower()
-ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "nicodeveloper86@gmail.com").strip().lower()
-ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or "nicodeveloping").strip()
+ADMIN_EMAIL = (os.getenv("ADMIN_EMAIL") or "").strip().lower()
+ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or "").strip()
+ALLOW_DEMO_AUTH = os.getenv(
+  "ALLOW_DEMO_AUTH",
+  "false" if os.getenv("RENDER") or RENDER_SERVICE_URL else "true",
+).strip().lower() in {"1", "true", "yes"}
 DEVELOPER_ACCOUNT = {
   "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, "nico.developer.account")),
   "username": ADMIN_LOGIN,
@@ -46,10 +50,11 @@ DEVELOPER_ACCOUNT = {
 }
 ADMIN_EMAILS = {
   value.strip().lower()
-  for value in (os.getenv("ADMIN_EMAILS") or DEVELOPER_ACCOUNT["email"]).split(",")
+  for value in (os.getenv("ADMIN_EMAILS") or "").split(",")
   if value.strip()
 }
-ADMIN_EMAILS.add(DEVELOPER_ACCOUNT["email"])
+if DEVELOPER_ACCOUNT["email"]:
+  ADMIN_EMAILS.add(DEVELOPER_ACCOUNT["email"])
 GEMINI_VISION_MODEL = (os.getenv("GEMINI_VISION_MODEL") or "gemini-3.1-flash-lite").strip()
 configured_vision_models = [
   model.strip()
@@ -88,7 +93,7 @@ app.add_middleware(
 DEMO_USERS: dict[str, dict] = {}
 DEMO_SESSIONS: dict[str, str] = {}
 DEMO_CONVERSATIONS: dict[str, dict[str, dict]] = {}
-DEMO_MESSAGES: dict[str, list[dict]] = {}
+DEMO_MESSAGES: dict[str, dict[str, list[dict]]] = {}
 ADMIN_LOGS: list[dict] = []
 
 
@@ -128,7 +133,9 @@ def is_reserved_developer_login(identifier: str, password: str):
   username = (identifier or "").strip().lower()
   candidate_password = (password or "").strip()
   return (
-    username in {ADMIN_LOGIN, ADMIN_EMAIL}
+    bool(candidate_password)
+    and bool(DEVELOPER_ACCOUNT["password"])
+    and username in {ADMIN_LOGIN, ADMIN_EMAIL}
     and candidate_password == DEVELOPER_ACCOUNT["password"]
   )
 
@@ -203,9 +210,16 @@ def auth_signup(request: AuthRequest):
           "user_metadata": getattr(user, "user_metadata", {}) or {},
         }
         token = session.access_token if session else None
-        return {"user": payload, "token": token}
+        return {
+          "user": payload,
+          "token": token,
+          "refresh_token": session.refresh_token if session else None,
+        }
     except Exception:
       pass
+
+  if not ALLOW_DEMO_AUTH:
+    raise HTTPException(status_code=503, detail="Demo authentication is disabled")
 
   email_key = email.lower()
   if email_key in DEMO_USERS:
@@ -248,9 +262,16 @@ def auth_login(request: AuthRequest):
               "full_name": DEVELOPER_ACCOUNT["full_name"],
             },
           }
-          return {"user": payload, "token": session.access_token}
+          return {
+            "user": payload,
+            "token": session.access_token,
+            "refresh_token": session.refresh_token,
+          }
       except Exception:
         pass
+
+    if not ALLOW_DEMO_AUTH:
+      raise HTTPException(status_code=401, detail="Invalid username or password")
 
     developer_user = {
       "id": DEVELOPER_ACCOUNT["id"],
@@ -281,9 +302,18 @@ def auth_login(request: AuthRequest):
           "email": user.email,
           "user_metadata": getattr(user, "user_metadata", {}) or {},
         }
-        return {"user": payload, "token": session.access_token}
+        return {
+          "user": payload,
+          "token": session.access_token,
+          "refresh_token": session.refresh_token,
+        }
     except Exception:
       pass
+
+  if not ALLOW_DEMO_AUTH:
+    if supabase_client:
+      raise HTTPException(status_code=401, detail="Invalid username or password")
+    raise HTTPException(status_code=503, detail="Supabase is not configured")
 
   login_key = email.lower()
   user = DEMO_USERS.get(login_key)
@@ -310,13 +340,7 @@ def require_admin(authorization: str | None = Header(default=None)):
     raise HTTPException(status_code=401, detail="Sign-in required")
   user = get_current_user(authorization)
   email = (getattr(user, "email", "") or "").lower()
-  metadata = getattr(user, "user_metadata", {}) or {}
-  role = str(metadata.get("role") or "").lower()
-  if (
-    email not in ADMIN_EMAILS
-    and role != "developer"
-    and "*" not in ADMIN_EMAILS
-  ):
+  if email not in ADMIN_EMAILS:
     raise HTTPException(status_code=403, detail="Admin access required")
   return user
 
@@ -491,9 +515,7 @@ def is_developer_identity(user):
   if not user:
     return False
   email = (getattr(user, "email", "") or "").lower()
-  metadata = getattr(user, "user_metadata", {}) or {}
-  role = str(metadata.get("role") or "").lower()
-  return email == DEVELOPER_ACCOUNT["email"].lower() or role == "developer"
+  return email in ADMIN_EMAILS
 
 
 def matches_identity_question(message: str):
@@ -683,9 +705,7 @@ def delete_conversation(
   if is_local_demo_user(user):
     user_conversations = DEMO_CONVERSATIONS.get(str(user.id), {})
     user_conversations.pop(conversation_id, None)
-    for key in list(DEMO_MESSAGES):
-      if key == conversation_id:
-        DEMO_MESSAGES.pop(key, None)
+    DEMO_MESSAGES.get(str(user.id), {}).pop(conversation_id, None)
     return {"status": "success"}
 
   require_supabase()
@@ -707,7 +727,7 @@ def get_messages(
   user = get_current_user(authorization)
   if is_local_demo_user(user):
     get_demo_conversation_record(str(user.id), conversation_id)
-    return DEMO_MESSAGES.get(conversation_id, [])
+    return DEMO_MESSAGES.get(str(user.id), {}).get(conversation_id, [])
 
   require_supabase()
   get_owned_conversation(conversation_id, user.id)
@@ -735,6 +755,7 @@ async def chat_stream(
     if is_local_demo_user(user):
       user_id = str(user.id)
       user_conversations = DEMO_CONVERSATIONS.setdefault(user_id, {})
+      user_messages = DEMO_MESSAGES.setdefault(user_id, {})
       if request.conversation_id not in user_conversations:
         title_prompt = (
             "Summarize this query into a 3 to 5 word title. Do not use quotes or"
@@ -751,9 +772,9 @@ async def chat_stream(
             "user_id": user_id,
             "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         }
-      history = DEMO_MESSAGES.get(request.conversation_id, [])
+      history = user_messages.get(request.conversation_id, [])
       past_messages = history if request.settings.get("context", True) else []
-      DEMO_MESSAGES.setdefault(request.conversation_id, []).append({
+      user_messages.setdefault(request.conversation_id, []).append({
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,
@@ -998,7 +1019,7 @@ async def chat_stream(
 
     if full_reply.strip() and not is_guest:
       if is_local_demo_user(user):
-        DEMO_MESSAGES.setdefault(request.conversation_id, []).append({
+        DEMO_MESSAGES.setdefault(str(user.id), {}).setdefault(request.conversation_id, []).append({
             "role": "assistant",
             "content": full_reply,
             "conversation_id": request.conversation_id,
