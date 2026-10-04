@@ -239,35 +239,12 @@
     actions.prepend(hint);
   }
 
-  // ===== Copy button on each assistant reply (icon only, so exports stay clean) =====
-  const ICON =
-    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+  // ===== Legacy copy button disabled: script.js now renders Claude-style .msg-actions footer =====
   const chatBox = document.getElementById("chatBox");
   function decorate() {
     if (!chatBox) return;
-    chatBox
-      .querySelectorAll(".message.assistant:not(.thinking-indicator)")
-      .forEach((m) => {
-        if (
-          m.querySelector(":scope > .msg-copy") ||
-          !m.querySelector(".content")
-        )
-          return;
-        const b = el("button", "msg-copy");
-        b.type = "button";
-        b.title = "Copy reply";
-        b.setAttribute("aria-label", "Copy reply");
-        b.innerHTML = ICON;
-        b.addEventListener("click", () => {
-          navigator.clipboard
-            .writeText(m.querySelector(".content").innerText)
-            .then(() => {
-              b.classList.add("done");
-              setTimeout(() => b.classList.remove("done"), 1400);
-            });
-        });
-        m.append(b);
-      });
+    // Remove any legacy absolute copy buttons to avoid duplication with new footer
+    chatBox.querySelectorAll(".message .msg-copy").forEach((b) => b.remove());
   }
   if (chatBox) {
     new MutationObserver(decorate).observe(chatBox, {

@@ -582,6 +582,11 @@ if (addBtn) {
 }
 
 function clearSelectedAttachments() {
+  selectedAttachments.forEach((a) => {
+    if (a?.previewUrl) {
+      try { URL.revokeObjectURL(a.previewUrl); } catch {}
+    }
+  });
   selectedAttachments = [];
   renderAttachments();
 }
@@ -589,22 +594,35 @@ function clearSelectedAttachments() {
 function renderAttachments() {
   if (!attachmentList) return;
   attachmentList.innerHTML = "";
+  attachmentList.classList.toggle("has-items", selectedAttachments.length > 0);
   selectedAttachments.forEach((attachment, index) => {
     const chip = document.createElement("div");
     chip.className = "attachment-chip";
+    if (attachment.kind === "images") chip.classList.add("is-image");
 
     if (attachment.kind === "images" && attachment.previewUrl) {
       const preview = document.createElement("img");
       preview.className = "attachment-thumb";
       preview.src = attachment.previewUrl;
-      preview.alt = "";
+      preview.alt = attachment.file.name || "Attached image";
       chip.appendChild(preview);
     }
 
+    const meta = document.createElement("span");
+    meta.className = "attachment-meta";
     const nameSpan = document.createElement("span");
+    nameSpan.className = "attachment-name";
     nameSpan.title = attachment.file.name;
-    nameSpan.textContent = `${attachment.icon} ${attachment.file.name}`;
-    chip.appendChild(nameSpan);
+    nameSpan.textContent = attachment.file.name;
+    meta.appendChild(nameSpan);
+    if (attachment.file.size) {
+      const sizeSpan = document.createElement("span");
+      sizeSpan.className = "attachment-size";
+      const kb = attachment.file.size / 1024;
+      sizeSpan.textContent = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`;
+      meta.appendChild(sizeSpan);
+    }
+    chip.appendChild(meta);
 
     const removeButton = document.createElement("button");
     removeButton.className = "attachment-remove";
@@ -612,8 +630,10 @@ function renderAttachments() {
     removeButton.setAttribute("aria-label", `Remove ${attachment.file.name}`);
     removeButton.textContent = "×";
     removeButton.addEventListener("click", () => {
-      selectedAttachments.splice(index, 1);
+      const [removed] = selectedAttachments.splice(index, 1);
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
       renderAttachments();
+      userInput?.focus();
     });
 
     chip.appendChild(removeButton);
@@ -630,7 +650,9 @@ function selectFiles(kind) {
 
 function addSelectedFiles(kind, event) {
   const icon = kind === "images" ? "🖼️" : kind === "code" ? "⌘" : "📄";
+  let added = 0;
   Array.from(event.target.files || []).forEach((file) => {
+    if (selectedAttachments.length >= 10) return;
     if (
       !selectedAttachments.some(
         (attachment) =>
@@ -644,25 +666,56 @@ function addSelectedFiles(kind, event) {
         icon,
         previewUrl: kind === "images" ? URL.createObjectURL(file) : null,
       });
+      added += 1;
     }
   });
   event.target.value = "";
   renderAttachments();
+  if (added > 0) showComposerToast(added === 1 ? "File attached" : `${added} files attached`);
 }
 
 function getPastedImageExtension(mimeType) {
-  const extension = mimeType.split("/")[1]?.split(";")[0]?.toLowerCase();
+  const extension = (mimeType || "").split("/")[1]?.split(";")[0]?.toLowerCase();
   return extension === "jpeg" ? "jpg" : extension || "png";
 }
 
+function showComposerToast(text) {
+  const toast = document.getElementById("composerToast");
+  if (!toast) return;
+  toast.textContent = text;
+  toast.classList.add("show");
+  clearTimeout(showComposerToast._t);
+  showComposerToast._t = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+function autoGrowComposer() {
+  if (!userInput) return;
+  userInput.style.height = "auto";
+  userInput.style.height = Math.min(userInput.scrollHeight, 160) + "px";
+}
+
 function addImageAttachments(imageFiles) {
+  let added = 0;
   imageFiles.forEach((file, index) => {
+    if (!file) return;
+    if (selectedAttachments.length >= 10) {
+      showComposerToast("Max 10 attachments");
+      return;
+    }
+    if (file.size && file.size > 12 * 1024 * 1024) {
+      showComposerToast(`${file.name || "Image"} is too large (12MB max)`);
+      return;
+    }
     const extension = getPastedImageExtension(file.type);
-    const name = `pasted-image-${Date.now()}-${index + 1}.${extension}`;
-    const pastedFile = new File([file], name, {
-      type: file.type || "image/png",
-      lastModified: Date.now(),
-    });
+    const baseName = (file.name && !file.name.startsWith("image.") && !file.name.startsWith("blob"))
+      ? file.name
+      : `pasted-image-${Date.now()}-${index + 1}.${extension}`;
+    const pastedFile = file instanceof File
+      ? file
+      : new File([file], baseName, {
+        type: file.type || "image/png",
+        lastModified: Date.now(),
+      });
 
     selectedAttachments.push({
       file: pastedFile,
@@ -670,31 +723,100 @@ function addImageAttachments(imageFiles) {
       icon: "🖼️",
       previewUrl: URL.createObjectURL(pastedFile),
     });
+    added += 1;
   });
 
   renderAttachments();
+  autoGrowComposer();
+  if (added > 0) {
+    showComposerToast(added === 1 ? "Image attached — press Send" : `${added} images attached`);
+    userInput?.focus();
+  }
 }
 
 function getClipboardImageFiles(clipboard) {
+  if (!clipboard) return [];
   const clipboardItems = Array.from(clipboard?.items || []);
   const itemImages = clipboardItems
-    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+    .filter((item) => item.kind === "file" && (item.type || "").startsWith("image/"))
     .map((item) => item.getAsFile())
     .filter(Boolean);
   const fileImages = Array.from(clipboard?.files || []).filter((file) =>
-    file.type.startsWith("image/"),
+    (file.type || "").startsWith("image/"),
   );
   return itemImages.length > 0 ? itemImages : fileImages;
 }
 
-function addPastedImages(event) {
-  if (event.target !== userInput) return;
-  const imageFiles = getClipboardImageFiles(event.clipboardData);
+function isEditableTarget(target) {
+  if (!target || !target.closest) return false;
+  return Boolean(
+    target.closest(
+      "#authScreen, #settingsPanel, .settings-panel, input:not(#userInput), textarea:not(#userInput)",
+    ),
+  );
+}
 
+function addPastedImages(event) {
+  const imageFiles = getClipboardImageFiles(event.clipboardData);
   if (imageFiles.length === 0) return;
+  // Don't hijack pastes in auth / settings fields
+  if (isEditableTarget(event.target)) return;
 
   event.preventDefault();
+  event.stopPropagation();
   addImageAttachments(imageFiles);
+}
+
+function addDroppedFiles(dataTransfer) {
+  if (!dataTransfer) return false;
+  const files = Array.from(dataTransfer.files || []);
+  if (files.length === 0) return false;
+  const images = files.filter((f) => (f.type || "").startsWith("image/"));
+  const others = files.filter((f) => !(f.type || "").startsWith("image/"));
+  if (images.length) addImageAttachments(images);
+  others.forEach((file) => {
+    if (selectedAttachments.length >= 10) return;
+    selectedAttachments.push({
+      file,
+      kind: /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(file.name) || (file.type || "").startsWith("text/")
+        ? "code"
+        : "files",
+      icon: "📄",
+      previewUrl: null,
+    });
+  });
+  if (others.length) renderAttachments();
+  return images.length > 0 || others.length > 0;
+}
+
+function initComposerDragDrop() {
+  const pill = document.getElementById("inputPill");
+  const overlay = document.getElementById("dropOverlay");
+  if (!pill) return;
+  let dragDepth = 0;
+  ["dragenter", "dragover"].forEach((name) =>
+    pill.addEventListener(name, (e) => {
+      if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+      e.preventDefault();
+      dragDepth += 1;
+      pill.classList.add("drag-over");
+      if (overlay) overlay.setAttribute("aria-hidden", "false");
+    }),
+  );
+  ["dragleave", "drop"].forEach((name) =>
+    pill.addEventListener(name, (e) => {
+      if (name === "dragleave") dragDepth = Math.max(0, dragDepth - 1);
+      else dragDepth = 0;
+      if (dragDepth === 0) {
+        pill.classList.remove("drag-over");
+        if (overlay) overlay.setAttribute("aria-hidden", "true");
+      }
+      if (name === "drop") {
+        e.preventDefault();
+        if (addDroppedFiles(e.dataTransfer)) showComposerToast("Files attached");
+      }
+    }),
+  );
 }
 
 document
@@ -1008,6 +1130,278 @@ function attachCodeCopyButtons(messageDiv) {
   });
 }
 
+function timeAgo(timestamp) {
+  const diff = Date.now() - timestamp;
+  if (diff < 45 * 1000) return "just now";
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins === 1) return "1 minute ago";
+  if (mins < 60) return `${mins} minutes ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours === 1) return "1 hour ago";
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
+function refreshTimestamps() {
+  document.querySelectorAll(".msg-timestamp").forEach((el) => {
+    const ts = Number(el.dataset.timestamp || 0);
+    if (ts) el.textContent = timeAgo(ts);
+  });
+}
+setInterval(refreshTimestamps, 30000);
+
+function speakText(text) {
+  if (!("speechSynthesis" in window)) {
+    showComposerToast("Voice playback not supported");
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const clean = (text || "").replace(/<[^>]*>/g, "").slice(0, 2000);
+  if (!clean.trim()) return;
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.rate = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
+function getLastUserText() {
+  const users = Array.from(chatBox.querySelectorAll(".message.user .content"));
+  if (!users.length) return "";
+  // Strip image alts - content includes text + images; use dataset raw if present
+  const last = users[users.length - 1].closest(".message");
+  return last?.dataset?.raw || users[users.length - 1].innerText || "";
+}
+
+async function streamAssistantResponse(apiMessage, apiAttachments = []) {
+  ensureTypingIndicator();
+  const indicator = document.getElementById("typingIndicator");
+  if (indicator) {
+    setResponsePhase(indicator, null, "thinking");
+    chatBox.appendChild(indicator);
+  }
+  chatBox.scrollTop = chatBox.scrollHeight;
+  if (sendBtn) {
+    sendBtn.innerText = "Stop";
+    sendBtn.onclick = stopGeneration;
+  }
+  currentAbortController = new AbortController();
+  const assistantMsgDiv = document.createElement("div");
+  assistantMsgDiv.className = "message assistant";
+  assistantMsgDiv.innerHTML = `<span class="avatar-tag">${settings.avatar}</span><div class="content"></div>`;
+  const contentDiv = assistantMsgDiv.querySelector(".content");
+  contentDiv.style.visibility = "hidden";
+  if (indicator) chatBox.insertBefore(assistantMsgDiv, indicator);
+  else chatBox.appendChild(assistantMsgDiv);
+  let accumulatedText = "";
+  let sentenceBuffer = "";
+  let typingStarted = false;
+  let streamComplete = false;
+  let typewriterCleanup = null;
+  let typingDelayTimer = null;
+  try {
+    const response = await apiFetch(`${apiBaseUrl}/chat/stream`, {
+      allowGuest: true,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: currentAbortController.signal,
+      body: JSON.stringify({
+        message: apiMessage,
+        conversation_id: currentConversationId,
+        attachments: apiAttachments,
+        settings,
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Request failed with status ${response.status}`);
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const triggerTypingFlow = () => {
+      if (typingStarted) return;
+      typingStarted = true;
+      if (typingDelayTimer) {
+        clearTimeout(typingDelayTimer);
+        typingDelayTimer = null;
+      }
+      setResponsePhase(indicator, contentDiv, "typing");
+      indicator?.remove();
+      typewriterCleanup = startTypewriterReveal(
+        contentDiv,
+        () => accumulatedText,
+        () => streamComplete,
+        () => {
+          attachCodeCopyButtons(assistantMsgDiv);
+          attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        },
+      );
+      setTimeout(() => {
+        if (!assistantMsgDiv.querySelector(":scope > .msg-actions") && accumulatedText) {
+          attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText);
+        }
+      }, 4000);
+    };
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      accumulatedText += chunk;
+      sentenceBuffer += chunk;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      let match;
+      const sentenceRegex = /([^.!?\n]+[.!?\n]+)/g;
+      while ((match = sentenceRegex.exec(sentenceBuffer)) !== null) {
+        const sentence = match[0];
+        queueSentence(sentence);
+        sentenceBuffer = sentenceBuffer.slice(match.index + sentence.length);
+        sentenceRegex.lastIndex = 0;
+      }
+    }
+    if (sentenceBuffer.trim()) queueSentence(sentenceBuffer);
+    streamComplete = true;
+    typingDelayTimer = setTimeout(triggerTypingFlow, 1400);
+    if (!authClient && currentUser) {
+      appendLocalConversationMessage(currentConversationId, "assistant", accumulatedText);
+      upsertLocalConversation({ id: currentConversationId, title: "Untitled Chat", user_id: currentUser.id });
+    }
+    if (settings.sound) playCompletionChime();
+    loadRecentConversations();
+  } catch (error) {
+    if (typingDelayTimer) {
+      clearTimeout(typingDelayTimer);
+      typingDelayTimer = null;
+    }
+    if (typewriterCleanup) typewriterCleanup();
+    setResponsePhase(indicator, contentDiv, "error");
+    indicator?.remove();
+    if (error.name === "AbortError") {
+      contentDiv.innerHTML += " <i>[Generation stopped]</i>";
+      contentDiv.style.visibility = "visible";
+      attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText || "[stopped]");
+    } else {
+      contentDiv.innerText = `Error: ${error.message || "Could not connect to Nico backend."}`;
+      contentDiv.style.visibility = "visible";
+      attachMessageFooter(assistantMsgDiv, "assistant", contentDiv.innerText);
+    }
+  } finally {
+    currentAbortController = null;
+    resetSendButton();
+  }
+}
+
+async function retryLastMessage() {
+  const lastUserText = getLastUserText();
+  if (!lastUserText && selectedAttachments.length === 0) {
+    showComposerToast("Nothing to retry yet");
+    return;
+  }
+  // Claude-style regenerate: remove last assistant reply, do NOT duplicate user bubble
+  const allMsgs = Array.from(chatBox.querySelectorAll(".message"));
+  const userMsgs = allMsgs.filter((m) => m.classList.contains("user"));
+  const lastUser = userMsgs[userMsgs.length - 1];
+  if (lastUser) {
+    const lastUserIdx = allMsgs.indexOf(lastUser);
+    for (let i = allMsgs.length - 1; i > lastUserIdx; i -= 1) {
+      if (allMsgs[i].classList.contains("assistant") && !allMsgs[i].classList.contains("thinking-indicator")) {
+        allMsgs[i].remove();
+        break;
+      }
+    }
+    const retryText = lastUser.dataset?.raw || lastUser.querySelector(".content")?.innerText || lastUserText;
+    const retryImgs = Array.from(lastUser.querySelectorAll("img.message-image-preview"))
+      .map((img) => ({ name: img.alt || "attached-image.jpg", mime_type: "image/jpeg", data_url: img.src }))
+      .filter((a) => a.data_url && a.data_url.startsWith("data:"));
+    showComposerToast("Regenerating…");
+    await streamAssistantResponse(retryText, retryImgs);
+    return;
+  }
+  userInput.value = lastUserText;
+  autoGrowComposer();
+  await sendMessage();
+}
+
+function attachMessageFooter(msgDiv, role, rawText) {
+  if (msgDiv.querySelector(":scope > .msg-actions")) return;
+  const timestamp = Date.now();
+  msgDiv.dataset.timestamp = String(timestamp);
+  msgDiv.dataset.raw = (rawText || "").slice(0, 8000);
+  msgDiv.dataset.role = role;
+
+  const bar = document.createElement("div");
+  bar.className = "msg-actions";
+  bar.setAttribute("aria-label", "Message actions");
+
+  const mkBtn = (label, title, svg, fn, extraClass = "") => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `msg-action-btn ${extraClass}`.trim();
+    b.title = title;
+    b.setAttribute("aria-label", label);
+    b.innerHTML = svg;
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      fn(b);
+    });
+    return b;
+  };
+
+  const ICONS = {
+    copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
+    speak: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+    good: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+    bad: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>',
+    retry: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+    edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+  };
+
+  const contentEl = msgDiv.querySelector(".content");
+  const getText = () => contentEl?.innerText || msgDiv.dataset.raw || "";
+
+  bar.appendChild(
+    mkBtn("Copy", "Copy", ICONS.copy, (btn) => {
+      navigator.clipboard.writeText(getText()).then(() => {
+        btn.classList.add("done");
+        setTimeout(() => btn.classList.remove("done"), 1200);
+      });
+    }),
+  );
+
+  if (role === "assistant") {
+    bar.appendChild(mkBtn("Read aloud", "Read aloud", ICONS.speak, () => speakText(getText())));
+    const goodBtn = mkBtn("Good response", "Good response", ICONS.good, (btn) => {
+      const active = btn.classList.toggle("active");
+      badBtn.classList.remove("active");
+      try { localStorage.setItem(`nico_feedback:${msgDiv.dataset.timestamp}`, active ? "up" : ""); } catch {}
+    });
+    const badBtn = mkBtn("Bad response", "Bad response", ICONS.bad, (btn) => {
+      const active = btn.classList.toggle("active");
+      goodBtn.classList.remove("active");
+      try { localStorage.setItem(`nico_feedback:${msgDiv.dataset.timestamp}`, active ? "down" : ""); } catch {}
+    });
+    bar.append(goodBtn, badBtn);
+    bar.appendChild(mkBtn("Retry", "Retry", ICONS.retry, () => retryLastMessage()));
+  } else {
+    bar.appendChild(
+      mkBtn("Edit and resend", "Edit and resend", ICONS.edit, () => {
+        userInput.value = getText();
+        autoGrowComposer();
+        userInput.focus();
+      }),
+    );
+  }
+
+  const time = document.createElement("span");
+  time.className = "msg-timestamp";
+  time.dataset.timestamp = String(timestamp);
+  time.textContent = "just now";
+  bar.appendChild(time);
+
+  msgDiv.appendChild(bar);
+}
+
 function appendMessage(role, text, attachments = []) {
   // Update state for non-empty chats
   appLayout?.classList.remove("new-chat-mode");
@@ -1031,10 +1425,13 @@ function appendMessage(role, text, attachments = []) {
         image.className = "message-image-preview";
         image.src = attachment.data_url;
         image.alt = attachment.name || "Attached image";
+        image.loading = "lazy";
         content.appendChild(image);
       });
     msgDiv.appendChild(content);
   }
+
+  attachMessageFooter(msgDiv, role, text);
 
   ensureTypingIndicator();
   const indicator = document.getElementById("typingIndicator");
@@ -1423,15 +1820,19 @@ if (sendBtn) {
 }
 
 if (userInput) {
+  autoGrowComposer();
+  userInput.addEventListener("input", autoGrowComposer);
   userInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       sendMessage();
     }
   });
 }
 
-document.addEventListener("paste", addPastedImages);
+// Capture-phase paste: accepts Ctrl+V images anywhere in chat except auth/settings
+document.addEventListener("paste", addPastedImages, true);
+initComposerDragDrop();
 
 async function sendMessage() {
   const typedMessage = userInput.value.trim();
@@ -1447,6 +1848,7 @@ async function sendMessage() {
   ) {
     appendMessage("user", displayMessage, attachmentRequest.attachments);
     userInput.value = "";
+    autoGrowComposer();
     clearSelectedAttachments();
     handleCommand(message);
     return;
@@ -1470,6 +1872,12 @@ async function sendMessage() {
     }
   }
   userInput.value = "";
+  autoGrowComposer();
+  selectedAttachments.forEach((a) => {
+    if (a?.previewUrl) {
+      try { URL.revokeObjectURL(a.previewUrl); } catch {}
+    }
+  });
   selectedAttachments = [];
   renderAttachments();
 
@@ -1544,7 +1952,18 @@ async function sendMessage() {
         contentDiv,
         () => accumulatedText,
         () => streamComplete,
+        () => {
+          attachCodeCopyButtons(assistantMsgDiv);
+          attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText);
+          chatBox.scrollTop = chatBox.scrollHeight;
+        },
       );
+      // Fallback: if stream was empty, still add footer so quick buttons show
+      setTimeout(() => {
+        if (!assistantMsgDiv.querySelector(":scope > .msg-actions") && accumulatedText) {
+          attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText);
+        }
+      }, 4000);
     };
 
     while (true) {

@@ -297,36 +297,49 @@
         </div>
 
         <!-- Floating Glass Input Bar -->
-        <div class="input-wrapper">
+        <div class="input-wrapper" id="inputWrapper">
             <div class="mode-chips" id="modeChips" aria-label="Quick modes"></div>
-            <div class="input-pill">
-                <button id="addBtn" class="icon-btn add-btn" type="button" aria-label="Open tools" aria-expanded="false" aria-controls="addFilesDropdown" title="Open tools">+</button>
-                <input type="text" id="userInput" placeholder="Ask Nico...">
+            <div class="attachment-list" id="attachmentList" aria-live="polite"></div>
+
+            <div class="input-pill" id="inputPill">
+                <button id="addBtn" class="icon-btn add-btn" type="button" aria-label="Add files" aria-expanded="false" aria-controls="addFilesDropdown" title="Add files (or paste images with Ctrl+V)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+                <textarea id="userInput" rows="1" placeholder="Ask Nico...  (paste images with Ctrl+V)" aria-label="Message Nico"></textarea>
                 <div class="input-actions">
                     <button id="micBtn" class="icon-btn" type="button" title="Voice Input"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
                     <button id="sendBtn" class="send-btn" type="button">Send</button>
                 </div>
+                <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+                    <div class="drop-overlay-inner">
+                        <span class="drop-overlay-icon">🖼️</span>
+                        <strong>Drop images to attach</strong>
+                        <small>or paste with Ctrl+V</small>
+                    </div>
+                </div>
             </div>
 
-            <div class="attachment-list" id="attachmentList" aria-live="polite"></div>
+            <div class="composer-toast" id="composerToast" role="status" aria-live="polite"></div>
 
-            <div class="add-files-dropdown" id="addFilesDropdown" aria-hidden="true">
-                <button class="dropdown-item" id="addFilesBtn" type="button">
-                    <span class="dropdown-icon">📄</span>
-                    <span>Add Files</span>
+            <div class="add-files-dropdown" id="addFilesDropdown" aria-hidden="true" role="menu" aria-label="Add files">
+                <p class="composer-menu-heading">Add to chat</p>
+                <button class="dropdown-item" id="addFilesBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">📄</span>
+                    <span class="dropdown-text"><span class="dropdown-title">Upload files</span><span class="dropdown-sub">Documents, PDFs, text</span></span>
                 </button>
-                <button class="dropdown-item" id="addImagesBtn" type="button">
-                    <span class="dropdown-icon">🖼️</span>
-                    <span>Add Images</span>
+                <button class="dropdown-item" id="addImagesBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">🖼️</span>
+                    <span class="dropdown-text"><span class="dropdown-title">Add photos</span><span class="dropdown-sub">JPG, PNG, GIF, WebP</span></span>
                 </button>
-                <button class="dropdown-item" id="pasteImageBtn" type="button">
-                    <span class="dropdown-icon">📋</span>
-                    <span>Paste Image</span>
+                <button class="dropdown-item" id="pasteImageBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">📋</span>
+                    <span class="dropdown-text"><span class="dropdown-title">Paste from clipboard</span><span class="dropdown-sub">Ctrl+V anywhere in chat</span></span>
                 </button>
-                <button class="dropdown-item" id="addCodeBtn" type="button">
-                    <span class="dropdown-icon">⌨️</span>
-                    <span>Add Code</span>
+                <button class="dropdown-item" id="addCodeBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">⌨️</span>
+                    <span class="dropdown-text"><span class="dropdown-title">Add code</span><span class="dropdown-sub">Source files &amp; snippets</span></span>
                 </button>
+                <p class="dropdown-hint">Tip: screenshot then Ctrl+V to attach instantly</p>
             </div>
             <input id="filePicker" class="visually-hidden" type="file" multiple aria-hidden="true" tabindex="-1">
             <input id="imagePicker" class="visually-hidden" type="file" accept="image/*" multiple aria-hidden="true" tabindex="-1">
@@ -336,7 +349,7 @@
     </main>
 </div>
 
-<script src="script.js?v=clipboard-paste-2"></script>
+<script src="script.js?v=claude-ui-paste-1"></script>
 <script src="nico-ui.js"></script>
 <script>
     if ("serviceWorker" in navigator) {

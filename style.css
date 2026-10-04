@@ -518,15 +518,20 @@ body::before {
     right: 0;
     z-index: 1200;
     display: none;
-    width: 190px;
+    width: 200px;
     padding: 6px;
-    border: 1px solid color-mix(in srgb, var(--accent) 28%, rgba(255, 255, 255, 0.12));
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-color: color-mix(in srgb, var(--accent) 28%, rgba(255, 255, 255, 0.12));
     border-radius: 16px;
+    background: rgba(22, 24, 30, 0.98);
     background: color-mix(in srgb, var(--accent) 7%, rgba(22, 24, 30, 0.97));
-    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42), 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
     backdrop-filter: blur(22px);
     -webkit-backdrop-filter: blur(22px);
     transform-origin: top right;
+    /* Stack items vertically - fixes overlapping text */
+    flex-direction: column;
+    gap: 2px;
 }
 
 .conversation-menu[hidden] {
@@ -534,7 +539,7 @@ body::before {
 }
 
 .conversation-menu.is-open {
-    display: grid;
+    display: flex;
     animation: conversation-menu-in 0.16s ease-out both;
 }
 
@@ -548,6 +553,7 @@ body::before {
     align-items: center;
     gap: 10px;
     width: 100%;
+    box-sizing: border-box;
     min-height: 36px;
     padding: 8px 10px;
     border: 0;
@@ -557,12 +563,16 @@ body::before {
     cursor: pointer;
     font: inherit;
     font-size: 0.78rem;
+    line-height: 1.25;
+    white-space: nowrap;
     text-align: left;
+    flex: 0 0 auto;
     transition: background 0.18s ease, color 0.18s ease;
 }
 
 .conversation-menu-item:hover,
 .conversation-menu-item:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
     background: color-mix(in srgb, var(--accent) 16%, transparent);
     color: var(--accent);
     outline: none;
@@ -579,8 +589,10 @@ body::before {
     align-items: center;
     justify-content: center;
     width: 18px;
+    min-width: 18px;
     color: currentColor;
     font-size: 1rem;
+    line-height: 1;
 }
 
 .sidebar-footer {
@@ -1597,13 +1609,24 @@ button.export-btn:hover {
 }
 
 
-.input-pill input {
+.input-pill input,
+.input-pill textarea {
     flex: 1;
     background: transparent;
     border: none;
     outline: none;
     color: #ffffff;
     font-size: 0.95rem;
+    font-family: inherit;
+}
+
+.input-pill textarea {
+    resize: none;
+    min-height: 24px;
+    max-height: 160px;
+    line-height: 1.5;
+    padding: 6px 2px;
+    overflow-y: auto;
 }
 
 .input-actions {
@@ -1657,22 +1680,23 @@ button.export-btn:hover {
     position: absolute;
     left: 20px;
     bottom: calc(100% + 8px);
-    width: min(360px, calc(100% - 40px));
+    width: min(320px, calc(100% - 40px));
     display: none;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
+    flex-direction: column;
+    gap: 2px;
     padding: 8px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 18px;
-    background: rgba(24, 25, 30, 0.94);
-    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+    background: rgba(24, 25, 30, 0.97);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     transform-origin: bottom left;
+    z-index: 50;
 }
 
 .add-files-dropdown.open {
-    display: grid;
+    display: flex;
     animation: tool-bubble-in 0.18s ease-out both;
 }
 
@@ -1687,24 +1711,15 @@ button.export-btn:hover {
     }
 }
 
-@keyframes tool-bubble-in {
-    from {
-        opacity: 0;
-        transform: translateY(8px) scale(0.94);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
-}
-
 .dropdown-item {
     min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: 10px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 12px;
@@ -1734,18 +1749,13 @@ button.export-btn:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.06);
-}
-
-.dropdown-item span:last-child {
-    overflow: hidden;
-    max-width: 100%;
-    font-size: 0.72rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 1.05rem;
 }
 
 .disclaimer {
@@ -1871,7 +1881,8 @@ button.export-btn:hover {
         padding: 0 4px;
     }
 
-    .input-pill input {
+    .input-pill input,
+    .input-pill textarea {
         font-size: 16px;
     }
 
@@ -2096,7 +2107,8 @@ button.export-btn:hover {
         border-radius: 20px;
     }
 
-    .input-pill input {
+    .input-pill input,
+    .input-pill textarea {
         min-width: 0;
         width: 0;
     }
@@ -2118,8 +2130,7 @@ button.export-btn:hover {
 
     .add-files-dropdown {
         bottom: calc(100% + 6px);
-        grid-template-columns: 1fr;
-        width: min(220px, calc(100vw - 24px));
+        width: min(300px, calc(100vw - 24px));
     }
 
     .dropdown-item {
