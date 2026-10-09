@@ -75,7 +75,7 @@ CREATOR_HOBBIES = os.getenv("CREATOR_HOBBIES", "Not provided")
 OPENCODE_API_KEY = (os.getenv("OPENCODE_API_KEY") or "").strip()
 OPENCODE_MODELS = [
   model.strip()
-  for model in os.getenv("OPENCODE_MODELS", "exo-free,step-5-preview-free").split(",")
+  for model in os.getenv("OPENCODE_MODELS", "nemotron-3-ultra-free,exo-free").split(",")
   if model.strip()
 ]
 try:
@@ -109,6 +109,8 @@ DEMO_SESSIONS: dict[str, str] = {}
 DEMO_CONVERSATIONS: dict[str, dict[str, dict]] = {}
 DEMO_MESSAGES: dict[str, dict[str, list[dict]]] = {}
 DEMO_MEMORIES: dict[str, list[dict]] = {}
+DEMO_BADGES: dict[str, list[dict]] = {}
+GRANTABLE_BADGES = {"tester", "major_supporter", "supporter"}
 MEMORY_CAP = 50
 ADMIN_LOGS: list[dict] = []
 
@@ -352,7 +354,10 @@ def auth_me(authorization: str | None = Header(default=None)):
   if not authorization or not authorization.startswith("Bearer "):
     raise HTTPException(status_code=401, detail="Sign-in required")
   user = get_current_user(authorization)
-  return {"user": {"id": user.id, "email": user.email, "user_metadata": user.user_metadata}}
+  return {
+    "user": {"id": user.id, "email": user.email, "user_metadata": user.user_metadata},
+    "badges": sorted(get_user_badges(user)),
+  }
 
 
 def require_admin(authorization: str | None = Header(default=None)):
@@ -1040,7 +1045,7 @@ async def zen_chat_once(model: str, messages: list, max_tokens: int = 60):
     return (((obj.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
 
 
-async def generate_title(text: str):
+async def generate_title(text: str, allow_zen: bool = False):
   prompt = (
     "Summarize this query into a 3 to 5 word title. Do not use quotes or"
     f" punctuation: '{text}'"
@@ -1054,7 +1059,7 @@ async def generate_title(text: str):
       return (title_res.choices[0].message.content or "").strip() or "Untitled Chat"
     except Exception:
       pass
-  if OPENCODE_API_KEY and OPENCODE_MODELS:
+  if OPENCODE_API_KEY and OPENCODE_MODELS and allow_zen:
     try:
       return (
         await zen_chat_once(
@@ -1362,6 +1367,156 @@ async def extract_memories(user, user_text: str, assistant_text: str):
     pass
 
 
+def get_user_badges(user):
+  badges = set()
+  user_id = str(user.id)
+  if is_local_demo_user(user):
+    for item in DEMO_BADGES.get(user_id, []):
+      if item.get("badge") in GRANTABLE_BADGES:
+        badges.add(item["badge"])
+  else:
+    try:
+      rows = (
+          supabase_client.table("user_badges")
+          .select("badge")
+          .eq("user_id", user_id)
+          .execute()
+      ).data or []
+      for row in rows:
+        if row.get("badge") in GRANTABLE_BADGES:
+          badges.add(row["badge"])
+    except Exception:
+      pass
+  if is_developer_identity(user):
+    badges.add("admin")
+  return badges
+
+
+def resolve_badge_user(email: str):
+  key = (email or "").strip().lower()
+  if not key:
+    return None, None
+  if key in DEMO_USERS:
+    return DEMO_USERS[key]["id"], DEMO_USERS[key]["email"]
+  if supabase_client:
+    try:
+      for candidate in supabase_client.auth.admin.list_users() or []:
+        if ((getattr(candidate, "email", "") or "").lower()) == key:
+          return str(candidate.id), candidate.email
+    except Exception:
+      pass
+  return None, None
+
+
+@app.get("/admin/badges")
+def admin_list_badges(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  items: list[dict] = []
+  for user_id, badges in DEMO_BADGES.items():
+    email = next(
+      (u["email"] for u in DEMO_USERS.values() if str(u["id"]) == str(user_id)),
+      user_id,
+    )
+    for item in badges:
+      items.append({"user_id": user_id, "email": email, **item})
+  if supabase_client:
+    try:
+      rows = supabase_client.table("user_badges").select(
+          "user_id, badge, granted_at"
+      ).order("granted_at", desc=True).limit(500).execute().data or []
+      emails: dict[str, str] = {}
+      try:
+        for candidate in supabase_client.auth.admin.list_users() or []:
+          emails[str(candidate.id)] = candidate.email or str(candidate.id)
+      except Exception:
+        pass
+      for row in rows:
+        items.append({
+          "user_id": row["user_id"],
+          "email": emails.get(str(row["user_id"]), str(row["user_id"])),
+          "badge": row["badge"],
+          "granted_at": row.get("granted_at"),
+        })
+    except Exception:
+      pass  # table not migrated yet; demo badges still listed
+  return {"badges": items}
+
+
+class BadgeGrantRequest(BaseModel):
+  email: str
+  badge: str
+
+
+@app.post("/admin/badges")
+def admin_grant_badge(
+    request: BadgeGrantRequest,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  badge = (request.badge or "").strip().lower()
+  if badge not in GRANTABLE_BADGES:
+    raise HTTPException(
+      status_code=400,
+      detail=f"Badge must be one of: {', '.join(sorted(GRANTABLE_BADGES))}",
+    )
+  user_id, email = resolve_badge_user(request.email)
+  if not user_id:
+    raise HTTPException(status_code=404, detail="No account found for that email")
+  now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+  if any(str(item.get("id")) == str(user_id) for item in DEMO_USERS.values()):
+    badges = DEMO_BADGES.setdefault(str(user_id), [])
+    if not any(item.get("badge") == badge for item in badges):
+      badges.append({"user_id": str(user_id), "badge": badge, "granted_at": now})
+    add_admin_log(f"Granted {badge} to {email}")
+    return {"status": "success", "badge": badge, "email": email}
+  require_supabase()
+  try:
+    existing = (
+        supabase_client.table("user_badges")
+        .select("badge")
+        .eq("user_id", user_id)
+        .eq("badge", badge)
+        .limit(1)
+        .execute()
+    ).data or []
+    if not existing:
+      supabase_client.table("user_badges").insert(
+          {"user_id": user_id, "badge": badge}
+      ).execute()
+  except Exception as error:
+    raise HTTPException(
+      status_code=503,
+      detail="Badges table is missing. Run the user_badges migration in Supabase, then redeploy.",
+    ) from error
+  add_admin_log(f"Granted {badge} to {email}")
+  return {"status": "success", "badge": badge, "email": email}
+
+
+@app.delete("/admin/badges")
+def admin_revoke_badge(
+    request: BadgeGrantRequest,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  badge = (request.badge or "").strip().lower()
+  user_id, email = resolve_badge_user(request.email)
+  if not user_id:
+    raise HTTPException(status_code=404, detail="No account found for that email")
+  if str(user_id) in DEMO_BADGES:
+    DEMO_BADGES[str(user_id)] = [
+      item for item in DEMO_BADGES[str(user_id)] if item.get("badge") != badge
+    ]
+  if supabase_client:
+    try:
+      supabase_client.table("user_badges").delete().eq(
+          "user_id", user_id
+      ).eq("badge", badge).execute()
+    except Exception:
+      pass
+  add_admin_log(f"Revoked {badge} from {email}")
+  return {"status": "success"}
+
+
 class MemoryRequest(BaseModel):
   content: str
 
@@ -1416,6 +1571,8 @@ async def chat_stream(
   user = get_current_user(authorization) if authorization else None
   is_guest = user is None
   is_admin_user = is_developer_identity(user) if user else False
+  # Zen fallback is reserved for badged accounts (admins included).
+  can_use_zen = bool(user) and bool(get_user_badges(user))
 
   if MAINTENANCE["enabled"] and not is_admin_user:
     async def _maintenance_reply():
@@ -1432,7 +1589,7 @@ async def chat_stream(
       user_conversations = DEMO_CONVERSATIONS.setdefault(user_id, {})
       user_messages = DEMO_MESSAGES.setdefault(user_id, {})
       if request.conversation_id not in user_conversations:
-        generated_title = await generate_title(request.message)
+        generated_title = await generate_title(request.message, can_use_zen)
         user_conversations[request.conversation_id] = {
             "id": request.conversation_id,
             "title": generated_title,
@@ -1458,7 +1615,7 @@ async def chat_stream(
       )
 
       if not conv_check.data:
-        generated_title = await generate_title(request.message)
+        generated_title = await generate_title(request.message, can_use_zen)
 
         supabase_client.table("conversations").insert({
             "id": request.conversation_id,
@@ -1655,7 +1812,9 @@ async def chat_stream(
           else None
         )
         zen_key = zen_quota_key(user, client_ip)
-        zen_available = bool(OPENCODE_API_KEY and OPENCODE_MODELS)
+        zen_available = (
+          bool(OPENCODE_API_KEY and OPENCODE_MODELS) and can_use_zen
+        )
         zen_skipped_quota = zen_available and not zen_quota_ok(zen_key)
         if zen_available and not zen_skipped_quota:
           models_to_try += [("zen", name) for name in OPENCODE_MODELS]

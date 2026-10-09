@@ -3613,6 +3613,30 @@ function setDeveloperDashboardVisibility(user) {
   dashboardButton.disabled = !visible;
 }
 
+async function loadMyBadges() {
+  const wrap = document.getElementById("identityBadges");
+  if (!wrap) return;
+  wrap.querySelectorAll(".earned-badge").forEach((el) => el.remove());
+  if (!currentUser) return;
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/auth/me`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const labels = {
+      tester: "Tester",
+      major_supporter: "Major Supporter",
+      supporter: "Supporter",
+    };
+    (data.badges || []).forEach((b) => {
+      if (b === "admin" || !labels[b]) return; // admin covered by Developer/Owner
+      const chip = document.createElement("span");
+      chip.className = `earned-badge badge-${b.replace(/[^a-z]/g, "")}`;
+      chip.textContent = labels[b];
+      wrap.appendChild(chip);
+    });
+  } catch {}
+}
+
 function updateAuthUi(user) {
   const userName = document.getElementById("user-name");
   const welcomeName = document.getElementById("welcomeName");
@@ -3638,6 +3662,7 @@ function updateAuthUi(user) {
     signOutButton.hidden = true;
     if (developerBadge) developerBadge.hidden = true;
     if (ownerBadge) ownerBadge.hidden = true;
+    loadMyBadges();
     currentUser = null;
     const restored = localStorage.getItem("active_chat_id");
     if (isValidConversationId(restored)) {
@@ -3686,6 +3711,7 @@ function updateAuthUi(user) {
   signInButton.hidden = true;
   signOutButton.hidden = false;
   setDeveloperDashboardVisibility(user);
+  loadMyBadges();
 
   if (!authUiInitialized) {
     const savedUserConversationId = localStorage.getItem(
@@ -4105,7 +4131,86 @@ async function renderAdminChats(body, query = "") {
 
 async function renderAdminUsers(body) {
   const data = await adminFetch("/admin/users");
-  body.innerHTML = `
+  body.innerHTML = "";
+  const badgeSection = document.createElement("div");
+  badgeSection.className = "admin-section";
+  const badgeTitle = document.createElement("h3");
+  badgeTitle.textContent = "Distribute badges";
+  const grantRow = document.createElement("div");
+  grantRow.className = "admin-toolbar";
+  const emailInput = document.createElement("input");
+  emailInput.className = "admin-search";
+  emailInput.placeholder = "user@email.com";
+  emailInput.setAttribute("aria-label", "User email");
+  const badgeSelect = document.createElement("select");
+  badgeSelect.className = "admin-search";
+  badgeSelect.setAttribute("aria-label", "Badge");
+  ["tester", "major_supporter", "supporter"].forEach((b) => {
+    const opt = document.createElement("option");
+    opt.value = b;
+    opt.textContent = b.replace(/_/g, " ");
+    badgeSelect.appendChild(opt);
+  });
+  const grantBtn = document.createElement("button");
+  grantBtn.type = "button";
+  grantBtn.textContent = "Grant";
+  const badgeList = document.createElement("div");
+  badgeList.className = "admin-log-list";
+  const paintBadges = async () => {
+    badgeList.innerHTML = "";
+    try {
+      const all = await adminFetch("/admin/badges");
+      (all.badges || []).forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "admin-log-item";
+        const when = document.createElement("time");
+        when.textContent = String(entry.badge || "").replace(/_/g, " ");
+        const txt = document.createElement("span");
+        txt.textContent = entry.email || entry.user_id;
+        const revoke = document.createElement("button");
+        revoke.type = "button";
+        revoke.className = "memory-del";
+        revoke.textContent = "×";
+        revoke.title = "Revoke";
+        revoke.setAttribute("aria-label", `Revoke ${entry.badge} from ${entry.email}`);
+        revoke.addEventListener("click", async () => {
+          await adminFetch("/admin/badges", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: entry.email, badge: entry.badge }),
+          });
+          paintBadges();
+        });
+        row.append(when, txt, revoke);
+        badgeList.appendChild(row);
+      });
+      if (!all.badges?.length) {
+        badgeList.innerHTML = '<div class="admin-log-item"><time>—</time>No badges granted yet.</div>';
+      }
+    } catch (error) {
+      badgeList.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
+    }
+  };
+  grantBtn.addEventListener("click", async () => {
+    if (!emailInput.value.trim()) return;
+    try {
+      await adminFetch("/admin/badges", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailInput.value.trim(), badge: badgeSelect.value }),
+      });
+      emailInput.value = "";
+      paintBadges();
+    } catch (error) {
+      showComposerToast(error.message);
+    }
+  });
+  grantRow.append(emailInput, badgeSelect, grantBtn);
+  badgeSection.append(badgeTitle, grantRow, badgeList);
+  body.appendChild(badgeSection);
+  paintBadges();
+  const rest = document.createElement("div");
+  rest.innerHTML = `
     <div class="admin-section">
       <h3>Demo accounts (${(data.demo_users || []).length})</h3>
       <div class="admin-log-list" id="adminDemoUsers"></div>
@@ -4121,6 +4226,7 @@ async function renderAdminUsers(body) {
       </div>
     </div>
   `;
+  while (rest.firstChild) body.appendChild(rest.firstChild);
   const list = body.querySelector("#adminDemoUsers");
   (data.demo_users || []).forEach((u) => {
     const row = document.createElement("div");

@@ -92,3 +92,22 @@ create policy "Users manage their memories"
   on public.memories for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Badges: admin-distributed roles (tester / major_supporter / supporter).
+-- Admins are implicit and need no row.
+create table if not exists public.user_badges (
+  user_id uuid references auth.users(id) on delete cascade,
+  badge text not null,
+  granted_at timestamptz not null default now(),
+  primary key (user_id, badge)
+);
+
+create index if not exists user_badges_user_id_idx
+  on public.user_badges(user_id);
+
+alter table public.user_badges enable row level security;
+
+drop policy if exists "Users read their badges" on public.user_badges;
+create policy "Users read their badges"
+  on public.user_badges for select
+  using (auth.uid() = user_id);

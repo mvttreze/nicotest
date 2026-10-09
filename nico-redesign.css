@@ -292,6 +292,14 @@ body .conversation-menu-item span:last-child{overflow:hidden;text-overflow:ellip
 .admin-control-btn{border-radius:10px;border:1px solid var(--line);background:var(--panel);color:inherit;font:600 .78rem var(--ui);padding:.55rem 1rem;cursor:pointer}
 .admin-control-btn:hover{border-color:var(--accent)}
 
+/* =================== earned badges =================== */
+.earned-badge{display:inline-flex;align-items:center;width:fit-content;padding:4px 8px;border-radius:999px;font-size:.64rem;letter-spacing:.08em;font-weight:700;text-transform:uppercase}
+.badge-tester{background:linear-gradient(135deg,rgba(167,228,111,.16),rgba(114,241,197,.24));border:1px solid rgba(167,228,111,.52);color:#e4ffd2}
+.badge-majorsupporter{background:linear-gradient(135deg,rgba(255,95,168,.18),rgba(124,92,255,.28));border:1px solid rgba(255,95,168,.55);color:#ffd6ec}
+.badge-supporter{background:linear-gradient(135deg,rgba(98,184,255,.16),rgba(98,184,255,.28));border:1px solid rgba(98,184,255,.52);color:#d8ecff}
+.admin-toolbar select.admin-search{max-width:150px}
+.admin-toolbar select.admin-search option{background:#161026;color:#f1ecff}
+
 /* =================== inline message editing =================== */
 body .message.editing .msg-actions{display:none}
 .inline-editor{flex:0 0 100%;display:flex;flex-direction:column;gap:8px;margin-top:8px}
