@@ -2664,7 +2664,7 @@ async function handleRememberCommand(raw) {
       "assistant",
       err?.message === "Sign-in required"
         ? "I can only keep long-term memories once you're signed in."
-        : "I couldn't save that — try again.",
+        : `I couldn't save that — ${err?.message || "try again"}.`,
       [],
     );
   }
