@@ -1,6 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+    // Legacy host guard: the old static site moved to nico-ai-assistant.
+    // Bounce every visitor (and their Google sign-in hash) to the new home.
+    (function () {
+      var LEGACY_HOSTS = ["nicotest-2.onrender.com"];
+      var CANONICAL = "https://nico-ai-assistant.onrender.com";
+      try {
+        if (LEGACY_HOSTS.indexOf(window.location.hostname) !== -1) {
+          window.location.replace(
+            CANONICAL +
+            window.location.pathname +
+            window.location.search +
+            window.location.hash
+          );
+        }
+      } catch (e) {}
+    })();
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
