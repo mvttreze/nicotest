@@ -3881,6 +3881,7 @@ function renderAdminOverview(body, stats, overview = {}) {
         <div class="admin-log-item"><time>render</time>${overview.render?.enabled ? `Enabled (${adminEsc(overview.render.status || "")})` : "Not configured"}</div>
         <div class="admin-log-item"><time>supabase</time>${overview.supabase?.enabled ? "Connected" : "Not configured"}</div>
         <div class="admin-log-item"><time>groq</time>${overview.services?.groq ? "Configured" : "Missing"}</div>
+        <div class="admin-log-item"><time>zen</time>${overview.services?.zen ? "Configured (fallback)" : "Missing"}</div>
         <div class="admin-log-item"><time>gemini</time>${overview.services?.gemini ? "Configured" : "Missing"}</div>
         <div class="admin-log-item"><time>url</time>${adminEsc(overview.app?.service_url || "n/a")}</div>
       </div>

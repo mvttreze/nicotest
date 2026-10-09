@@ -8,3 +8,5 @@ supabase
 pydantic
 pypdf
 python-docx
+requests
+httpx
