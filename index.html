@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
-    <link rel="stylesheet" href="style.css?v=fix6">
-    <link rel="stylesheet" href="nico-redesign.css?v=fix6">
+    <link rel="stylesheet" href="style.css?v=fix9">
+    <link rel="stylesheet" href="nico-redesign.css?v=fix9">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
@@ -116,6 +116,7 @@
 
     <!-- Main Content Area -->
     <main class="main-content">
+        <div class="announce-banner" id="announceBanner" role="status" hidden></div>
         <header class="top-header">
             <button class="mobile-menu-btn" id="menu-toggle" type="button" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button>
             <div class="top-header-actions">
@@ -364,7 +365,7 @@
     </main>
 </div>
 
-<script src="script.js?v=fix8"></script>
+<script src="script.js?v=fix9"></script>
 <script src="nico-ui.js"></script>
 <script>
     if ("serviceWorker" in navigator) {

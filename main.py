@@ -101,7 +101,11 @@ ADMIN_LOGS: list[dict] = []
 
 def add_admin_log(message: str):
   ADMIN_LOGS.append({"time": datetime.utcnow().isoformat(timespec="seconds") + "Z", "message": message})
-  ADMIN_LOGS[:] = ADMIN_LOGS[-25:]
+  ADMIN_LOGS[:] = ADMIN_LOGS[-100:]
+
+
+ANNOUNCEMENT: dict = {"text": "", "updated_at": ""}
+MAINTENANCE: dict = {"enabled": False}
 
 
 class AuthRequest(BaseModel):
@@ -366,6 +370,10 @@ def require_groq():
     raise HTTPException(status_code=503, detail="Groq is not configured")
 
 
+class RenameRequest(BaseModel):
+  title: str
+
+
 @app.get("/health")
 def health_check():
   add_admin_log("Health check requested")
@@ -423,7 +431,306 @@ def admin_overview(authorization: str | None = Header(default=None)):
 @app.get("/admin/logs")
 def admin_logs(authorization: str | None = Header(default=None)):
   require_admin(authorization)
-  return {"logs": ADMIN_LOGS[-20:]}
+  return {"logs": ADMIN_LOGS[-50:]}
+
+
+@app.get("/admin/logs")
+def admin_logs(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  return {"logs": ADMIN_LOGS[-50:]}
+
+
+@app.delete("/admin/logs")
+def clear_admin_logs(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  ADMIN_LOGS.clear()
+  return {"status": "success"}
+
+
+def supa_count(table: str):
+  try:
+    response = (
+        supabase_client.table(table).select("id", count="exact").limit(1).execute()
+    )
+    return response.count
+  except Exception:
+    return None
+
+
+def demo_totals():
+  convos = sum(len(by_user) for by_user in DEMO_CONVERSATIONS.values())
+  messages = sum(
+    len(msgs)
+    for by_convo in DEMO_MESSAGES.values()
+    for msgs in by_convo.values()
+  )
+  memories = sum(len(items) for items in DEMO_MEMORIES.values())
+  return convos, messages, memories
+
+
+@app.get("/admin/stats")
+def admin_stats(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  demo_convos, demo_messages, demo_memories = demo_totals()
+  stats = {
+    "conversations": demo_convos,
+    "messages": demo_messages,
+    "demo_users": len(DEMO_USERS),
+    "memories": demo_memories,
+  }
+  activity = []
+  if supabase_client:
+    try:
+      stats["conversations"] = (supa_count("conversations") or 0) + demo_convos
+      stats["messages"] = (supa_count("messages") or 0) + demo_messages
+      stats["memories"] = (supa_count("memories") or 0) + demo_memories
+      try:
+        admin_users = supabase_client.auth.admin.list_users()
+        stats["auth_users"] = len(admin_users or [])
+      except Exception:
+        stats["auth_users"] = None
+      rows = (
+          supabase_client.table("messages")
+          .select("created_at")
+          .order("created_at", desc=True)
+          .limit(1000)
+          .execute()
+      ).data or []
+      buckets: dict[str, int] = {}
+      for row in rows:
+        day = str(row.get("created_at") or "")[:10]
+        if day:
+          buckets[day] = buckets.get(day, 0) + 1
+      days = sorted(buckets)[-14:]
+      activity = [{"date": day, "messages": buckets[day]} for day in days]
+    except Exception as error:
+      stats["error"] = str(error)
+  else:
+    stats["auth_users"] = None
+  # Demo-side activity, merged into the same buckets.
+  demo_days: dict[str, int] = {}
+  for by_convo in DEMO_MESSAGES.values():
+    for msgs in by_convo.values():
+      for msg in msgs:
+        day = str(msg.get("created_at") or "")[:10]
+        if day:
+          demo_days[day] = demo_days.get(day, 0) + 1
+  merged: dict[str, int] = {item["date"]: item["messages"] for item in activity}
+  for day, count in demo_days.items():
+    merged[day] = merged.get(day, 0) + count
+  activity = [{"date": day, "messages": merged[day]} for day in sorted(merged)[-14:]]
+  return {
+    "counts": stats,
+    "activity": activity,
+    "announcement": ANNOUNCEMENT,
+    "maintenance": MAINTENANCE,
+  }
+
+
+@app.get("/admin/conversations")
+def admin_conversations(
+    q: str = "",
+    limit: int = 20,
+    offset: int = 0,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  limit = max(1, min(limit, 100))
+  needle = (q or "").strip().lower()
+  items: list[dict] = []
+  if supabase_client:
+    try:
+      query = (
+          supabase_client.table("conversations")
+          .select("id, title, user_id, created_at")
+          .order("created_at", desc=True)
+      )
+      if needle:
+        query = query.ilike("title", f"%{needle}%")
+      rows = query.range(0, offset + limit - 1).execute().data or []
+      for row in rows:
+        try:
+          count = (
+              supabase_client.table("messages")
+              .select("id", count="exact")
+              .eq("conversation_id", row["id"])
+              .limit(1)
+              .execute()
+          ).count or 0
+        except Exception:
+          count = None
+        items.append({**row, "message_count": count, "source": "supabase"})
+    except Exception as error:
+      raise HTTPException(status_code=503, detail=str(error)) from error
+  flat = [
+    {**convo, "source": "demo"}
+    for by_user in DEMO_CONVERSATIONS.values()
+    for convo in by_user.values()
+    if not needle or needle in str(convo.get("title") or "").lower()
+  ]
+  for convo in flat:
+    convo["message_count"] = len(
+      DEMO_MESSAGES.get(str(convo.get("user_id")), {}).get(convo["id"], [])
+    )
+  merged = sorted(
+    items + flat, key=lambda c: c.get("created_at", ""), reverse=True
+  )
+  return {"conversations": merged[offset:offset + limit]}
+
+
+@app.get("/admin/conversations/{conversation_id}/messages")
+def admin_conversation_messages(
+    conversation_id: str,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  for user_id, by_convo in DEMO_CONVERSATIONS.items():
+    if conversation_id in by_convo:
+      return {
+        "messages": DEMO_MESSAGES.get(user_id, {}).get(conversation_id, [])
+      }
+  require_supabase()
+  response = (
+      supabase_client.table("messages")
+      .select("role, content, created_at")
+      .eq("conversation_id", conversation_id)
+      .order("created_at")
+      .limit(500)
+      .execute()
+  )
+  return {"messages": response.data or []}
+
+
+@app.patch("/admin/conversations/{conversation_id}")
+def admin_rename_conversation(
+    conversation_id: str,
+    request: RenameRequest,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  title = (request.title or "").strip()[:120]
+  if not title:
+    raise HTTPException(status_code=400, detail="Title is required")
+  for by_convo in DEMO_CONVERSATIONS.values():
+    if conversation_id in by_convo:
+      by_convo[conversation_id]["title"] = title
+      return {"status": "success"}
+  require_supabase()
+  supabase_client.table("conversations").update(
+      {"title": title}
+  ).eq("id", conversation_id).execute()
+  add_admin_log(f"Renamed conversation {conversation_id[:8]}")
+  return {"status": "success"}
+
+
+@app.delete("/admin/conversations/{conversation_id}")
+def admin_delete_conversation(
+    conversation_id: str,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  found_demo = False
+  for user_id in list(DEMO_CONVERSATIONS):
+    if conversation_id in DEMO_CONVERSATIONS[user_id]:
+      found_demo = True
+    DEMO_CONVERSATIONS[user_id].pop(conversation_id, None)
+    DEMO_MESSAGES.get(user_id, {}).pop(conversation_id, None)
+  is_uuid = bool(
+    re.match(
+      r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      conversation_id,
+      re.IGNORECASE,
+    )
+  )
+  if supabase_client and (is_uuid or not found_demo):
+    try:
+      supabase_client.table("messages").delete().eq(
+          "conversation_id", conversation_id
+      ).execute()
+      supabase_client.table("conversations").delete().eq(
+          "id", conversation_id
+      ).execute()
+    except Exception as error:
+      raise HTTPException(status_code=503, detail=str(error)) from error
+  add_admin_log(f"Deleted conversation {conversation_id[:8]}")
+  return {"status": "success"}
+
+
+@app.get("/admin/users")
+def admin_users(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  demo = []
+  for email, user in DEMO_USERS.items():
+    uid = str(user["id"])
+    demo.append({
+      "id": uid,
+      "email": email,
+      "name": (user.get("user_metadata") or {}).get("full_name") or email.split("@")[0],
+      "role": (user.get("user_metadata") or {}).get("role") or "user",
+      "conversations": len(DEMO_CONVERSATIONS.get(uid, {})),
+      "messages": sum(len(m) for m in DEMO_MESSAGES.get(uid, {}).values()),
+      "memories": len(DEMO_MEMORIES.get(uid, [])),
+    })
+  supabase_users = None
+  if supabase_client:
+    try:
+      users = supabase_client.auth.admin.list_users() or []
+      supabase_users = [
+        {
+          "id": str(getattr(u, "id", "")),
+          "email": getattr(u, "email", ""),
+          "created_at": str(getattr(u, "created_at", "")),
+        }
+        for u in users[:100]
+      ]
+    except Exception:
+      supabase_users = None
+  return {"demo_users": demo, "supabase_users": supabase_users}
+
+
+@app.get("/announcement")
+def get_announcement():
+  return dict(ANNOUNCEMENT)
+
+
+@app.post("/admin/announcement")
+def set_announcement(
+    request: RenameRequest,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  ANNOUNCEMENT["text"] = (request.title or "").strip()[:300]
+  ANNOUNCEMENT["updated_at"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+  add_admin_log("Announcement updated")
+  return dict(ANNOUNCEMENT)
+
+
+@app.delete("/admin/announcement")
+def clear_announcement(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  ANNOUNCEMENT["text"] = ""
+  ANNOUNCEMENT["updated_at"] = ""
+  add_admin_log("Announcement cleared")
+  return dict(ANNOUNCEMENT)
+
+
+@app.get("/admin/maintenance")
+def get_maintenance(authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  return dict(MAINTENANCE)
+
+
+@app.post("/admin/maintenance")
+def set_maintenance(
+    payload: dict,
+    authorization: str | None = Header(default=None),
+):
+  require_admin(authorization)
+  MAINTENANCE["enabled"] = bool((payload or {}).get("enabled", False))
+  add_admin_log(
+    f"Maintenance {'enabled' if MAINTENANCE['enabled'] else 'disabled'}"
+  )
+  return dict(MAINTENANCE)
 
 
 class ChatRequest(BaseModel):
@@ -443,10 +750,6 @@ class ChatRequest(BaseModel):
     if total_bytes > 20_000_000:
       raise ValueError("Attachments are too large")
     return self
-
-
-class RenameRequest(BaseModel):
-  title: str
 
 
 def get_current_user(authorization: str | None):
@@ -923,6 +1226,15 @@ async def chat_stream(
   user = get_current_user(authorization) if authorization else None
   is_guest = user is None
   is_admin_user = is_developer_identity(user) if user else False
+
+  if MAINTENANCE["enabled"] and not is_admin_user:
+    async def _maintenance_reply():
+      yield "Nico is under maintenance right now. Try again in a bit."
+    return StreamingResponse(_maintenance_reply(), media_type="text/plain")
+
+  if not is_guest:
+    who = (getattr(user, "email", "") or "demo-user").split("@")[0]
+    add_admin_log(f"Chat from {who}: {(request.message or '')[:60]}")
 
   if not is_guest:
     if is_local_demo_user(user):

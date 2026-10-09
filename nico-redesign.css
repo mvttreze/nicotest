@@ -263,3 +263,31 @@ body .conversation-menu-item span:last-child{overflow:hidden;text-overflow:ellip
 .memory-del:hover{opacity:1;background:rgba(255,255,255,.12)}
 #briefCity{border-radius:12px;border:1px solid var(--line);background:var(--panel);color:inherit;padding:7px 8px;font:inherit;font-size:.72rem;max-width:170px}
 .icon-btn.wake-on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+
+/* =================== developer dashboard =================== */
+.announce-banner{width:min(100%,820px);margin:10px auto 0;padding:.55rem 1rem;border-radius:12px;border:1px solid var(--line);background:var(--panel);text-align:center;font-size:.8rem}
+.announce-banner[hidden]{display:none}
+.admin-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 10px}
+.admin-tab{flex:0 0 auto;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:inherit;font:600 .76rem var(--ui);padding:.42rem .95rem;cursor:pointer;opacity:.75}
+.admin-tab.is-active{background:var(--grad);border-color:transparent;color:#fff;opacity:1}
+.admin-tab-body{display:flex;flex-direction:column;gap:14px;overflow-y:auto;max-height:calc(100vh - 260px);padding-bottom:6px}
+.admin-toolbar{display:flex;gap:8px}
+.admin-toolbar button{border-radius:10px;border:1px solid var(--line);background:var(--panel);color:inherit;font:600 .74rem var(--ui);padding:.45rem .9rem;cursor:pointer}
+.admin-toolbar button:hover{border-color:var(--accent)}
+.admin-toolbar button.danger,.admin-row-actions button.danger,.admin-control-btn.danger{color:#fca5a5;border-color:rgba(239,68,68,.38)}
+.admin-search{flex:1;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:inherit;padding:.5rem .8rem;font:inherit;font-size:.78rem;outline:0}
+.admin-chart{display:flex;align-items:flex-end;gap:6px;padding:10px 4px 2px;min-height:110px}
+.admin-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.admin-bar span{width:100%;max-width:26px;border-radius:6px 6px 2px 2px;background:var(--grad)}
+.admin-bar small{font-size:.6rem;opacity:.55}
+.admin-chat-row{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.admin-chat-info{width:100%;display:flex;flex-direction:column;gap:2px;text-align:left;border:0;background:none;color:inherit;padding:10px 12px;cursor:pointer;font:inherit}
+.admin-chat-info strong{font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-chat-info small{opacity:.6;font-size:.68rem}
+.admin-chat-detail{padding:0 8px 8px;max-height:260px;overflow-y:auto}
+.admin-chat-detail[hidden]{display:none}
+.admin-row-actions{display:flex;gap:8px;padding:0 12px 10px}
+.admin-row-actions button{border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;font:600 .72rem var(--ui);padding:.35rem .8rem;cursor:pointer}
+.admin-row-actions button:hover{border-color:var(--accent)}
+.admin-control-btn{border-radius:10px;border:1px solid var(--line);background:var(--panel);color:inherit;font:600 .78rem var(--ui);padding:.55rem 1rem;cursor:pointer}
+.admin-control-btn:hover{border-color:var(--accent)}

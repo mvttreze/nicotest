@@ -3757,78 +3757,396 @@ async function initializeAuth() {
   updateAuthUi(data.session?.user || null);
 }
 
+async function adminFetch(path, options = {}) {
+  const response = await apiFetch(`${apiBaseUrl}${path}`, options);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || `Request failed (${response.status})`);
+  }
+  return response.json().catch(() => ({}));
+}
+
+function adminEsc(value) {
+  const element = document.createElement("div");
+  element.textContent = value ?? "";
+  return element.innerHTML;
+}
+
+let adminActiveTab = "overview";
+
 async function openDeveloperDashboard() {
   const panel = document.getElementById("adminDashboardPanel");
   const content = document.getElementById("adminDashboardContent");
   if (!panel || !content) return;
 
-  try {
-    const response = await apiFetch(`${apiBaseUrl}/admin/overview`);
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.detail || "Admin access required");
-    }
-    const data = await response.json();
-    const renderStatus = data.render?.status || "not_configured";
-    const supabaseStatus = data.supabase?.status || "not_configured";
-    const appStatus = data.status || "ok";
+  content.innerHTML = `<div class="admin-loading">Loading dashboard…</div>`;
+  panel.classList.add("is-open");
+  panel.hidden = false;
+  panel.setAttribute("aria-hidden", "false");
 
-    content.innerHTML = `
-      <div class="admin-dashboard-grid">
-        <div class="admin-card ${appStatus === "ok" ? "status-ok" : "status-bad"}">
-          <small>App status</small>
-          <strong>${appStatus === "ok" ? "Online" : "Warning"}</strong>
-        </div>
-        <div class="admin-card ${renderStatus === "ok" || renderStatus === "online" ? "status-ok" : "status-bad"}">
-          <small>Render</small>
-          <strong>${renderStatus}</strong>
-        </div>
-        <div class="admin-card ${supabaseStatus === "ok" ? "status-ok" : "status-bad"}">
-          <small>Supabase</small>
-          <strong>${supabaseStatus}</strong>
-        </div>
-        <div class="admin-card status-ok">
-          <small>Service URL</small>
-          <strong>${data.app?.service_url || "n/a"}</strong>
-        </div>
-      </div>
-      <div class="admin-section">
-        <h3>Environment</h3>
-        <div class="admin-log-list">
-          <div class="admin-log-item"><time>Render</time>${data.render?.enabled ? "Enabled" : "Not configured"}</div>
-          <div class="admin-log-item"><time>Supabase</time>${data.supabase?.enabled ? "Connected" : "Not configured"}</div>
-          <div class="admin-log-item"><time>Groq</time>${data.services?.groq ? "Configured" : "Missing"}</div>
-          <div class="admin-log-item"><time>Gemini</time>${data.services?.gemini ? "Configured" : "Missing"}</div>
-        </div>
-      </div>
-      <div class="admin-section">
-        <h3>Recent logs</h3>
-        <div class="admin-log-list">
-          ${
-            (data.logs || [])
-              .map(
-                (item) => `
-            <div class="admin-log-item"><time>${item.time}</time>${item.message}</div>
-          `,
-              )
-              .join("") ||
-            '<div class="admin-log-item"><time>now</time>No logs available yet.</div>'
-          }
-        </div>
-      </div>
-    `;
+  try {
+    const [overview, stats] = await Promise.all([
+      adminFetch("/admin/overview"),
+      adminFetch("/admin/stats"),
+    ]);
+    renderAdminTabs(content, overview, stats);
+    await renderAdminTab(content, adminActiveTab, stats, overview);
   } catch (error) {
     content.innerHTML = `
       <div class="admin-section">
         <h3>Dashboard unavailable</h3>
-        <div class="admin-log-item"><time>error</time>${error.message}</div>
+        <div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>
       </div>
     `;
   }
+}
 
-  panel.classList.add("is-open");
-  panel.hidden = false;
-  panel.setAttribute("aria-hidden", "false");
+function renderAdminTabs(content, overview, stats) {
+  const tabs = document.createElement("div");
+  tabs.className = "admin-tabs";
+  tabs.setAttribute("role", "tablist");
+  ["overview", "chats", "users", "controls", "logs"].forEach((name) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `admin-tab${adminActiveTab === name ? " is-active" : ""}`;
+    btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    btn.setAttribute("role", "tab");
+    btn.addEventListener("click", async () => {
+      adminActiveTab = name;
+      tabs.querySelectorAll(".admin-tab").forEach((t) =>
+        t.classList.toggle("is-active", t === btn),
+      );
+      await renderAdminTab(content, name, stats, overview);
+    });
+    tabs.appendChild(btn);
+  });
+  const body = document.createElement("div");
+  body.id = "adminTabBody";
+  body.className = "admin-tab-body";
+  content.innerHTML = "";
+  content.append(tabs, body);
+}
+
+async function renderAdminTab(content, name, stats, overview) {
+  const body = content.querySelector("#adminTabBody") || content;
+  body.innerHTML = `<div class="admin-loading">Loading…</div>`;
+  try {
+    if (name === "overview") return renderAdminOverview(body, stats, overview);
+    if (name === "chats") return await renderAdminChats(body);
+    if (name === "users") return await renderAdminUsers(body);
+    if (name === "controls") return renderAdminControls(body, stats);
+    if (name === "logs") return await renderAdminLogs(body);
+  } catch (error) {
+    body.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
+  }
+}
+
+function renderAdminOverview(body, stats, overview = {}) {
+  const counts = stats.counts || {};
+  const activity = stats.activity || [];
+  const peak = Math.max(1, ...activity.map((a) => a.messages));
+  const cards = [
+    ["Conversations", counts.conversations ?? "—"],
+    ["Messages", counts.messages ?? "—"],
+    ["Users", counts.auth_users ?? counts.demo_users ?? "—"],
+    ["Memories", counts.memories ?? "—"],
+  ]
+    .map(
+      ([label, value]) =>
+        `<div class="admin-card status-ok"><small>${label}</small><strong>${adminEsc(String(value))}</strong></div>`,
+    )
+    .join("");
+  body.innerHTML = `
+    <div class="admin-dashboard-grid">${cards}</div>
+    <div class="admin-section">
+      <h3>Messages / day</h3>
+      <div class="admin-chart">
+        ${activity.length ? activity.map((a) => `
+          <div class="admin-bar" title="${adminEsc(a.date)}: ${a.messages}">
+            <span style="height:${Math.max(4, Math.round((a.messages / peak) * 72))}px"></span>
+            <small>${adminEsc(a.date.slice(5))}</small>
+          </div>`).join("") : '<div class="admin-log-item"><time>—</time>No activity yet.</div>'}
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>Status</h3>
+      <div class="admin-log-list">
+        <div class="admin-log-item"><time>mode</time>Maintenance ${stats.maintenance?.enabled ? "ON" : "off"}</div>
+        <div class="admin-log-item"><time>note</time>${stats.announcement?.text ? adminEsc(stats.announcement.text) : "No announcement set."}</div>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>Environment</h3>
+      <div class="admin-log-list">
+        <div class="admin-log-item"><time>render</time>${overview.render?.enabled ? `Enabled (${adminEsc(overview.render.status || "")})` : "Not configured"}</div>
+        <div class="admin-log-item"><time>supabase</time>${overview.supabase?.enabled ? "Connected" : "Not configured"}</div>
+        <div class="admin-log-item"><time>groq</time>${overview.services?.groq ? "Configured" : "Missing"}</div>
+        <div class="admin-log-item"><time>gemini</time>${overview.services?.gemini ? "Configured" : "Missing"}</div>
+        <div class="admin-log-item"><time>url</time>${adminEsc(overview.app?.service_url || "n/a")}</div>
+      </div>
+    </div>
+  `;
+}
+
+async function renderAdminChats(body, query = "") {
+  const data = await adminFetch(
+    `/admin/conversations?q=${encodeURIComponent(query)}&limit=20`,
+  );
+  const rows = data.conversations || [];
+  body.innerHTML = "";
+  const toolbar = document.createElement("div");
+  toolbar.className = "admin-toolbar";
+  const search = document.createElement("input");
+  search.className = "admin-search";
+  search.placeholder = "Search chats…";
+  search.value = query;
+  search.setAttribute("aria-label", "Search conversations");
+  let debounce;
+  search.addEventListener("input", () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => renderAdminChats(body, search.value), 350);
+  });
+  toolbar.appendChild(search);
+  body.appendChild(toolbar);
+  const list = document.createElement("div");
+  list.className = "admin-log-list";
+  if (!rows.length) {
+    list.innerHTML = '<div class="admin-log-item"><time>—</time>No conversations found.</div>';
+  }
+  rows.forEach((convo) => {
+    const item = document.createElement("div");
+    item.className = "admin-chat-row";
+    const info = document.createElement("button");
+    info.type = "button";
+    info.className = "admin-chat-info";
+    const title = document.createElement("strong");
+    title.textContent = convo.title || "Untitled";
+    const meta = document.createElement("small");
+    meta.textContent = `${convo.message_count ?? "?"} msgs · ${String(convo.created_at || "").slice(0, 10)}`;
+    info.append(title, meta);
+    const detail = document.createElement("div");
+    detail.className = "admin-chat-detail";
+    detail.hidden = true;
+    info.addEventListener("click", async () => {
+      if (!detail.hidden) {
+        detail.hidden = true;
+        return;
+      }
+      detail.hidden = false;
+      detail.innerHTML = `<div class="admin-loading">Loading messages…</div>`;
+      try {
+        const data = await adminFetch(`/admin/conversations/${convo.id}/messages`);
+        detail.innerHTML = "";
+        (data.messages || []).forEach((m) => {
+          const row = document.createElement("div");
+          row.className = "admin-log-item";
+          const when = document.createElement("time");
+          when.textContent = m.role;
+          const txt = document.createElement("span");
+          txt.textContent = (m.content || "").slice(0, 400);
+          row.append(when, txt);
+          detail.appendChild(row);
+        });
+        if (!data.messages?.length) {
+          detail.innerHTML = '<div class="admin-log-item"><time>—</time>No messages.</div>';
+        }
+      } catch (error) {
+        detail.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
+      }
+    });
+    const actions = document.createElement("div");
+    actions.className = "admin-row-actions";
+    const rename = document.createElement("button");
+    rename.type = "button";
+    rename.textContent = "Rename";
+    rename.addEventListener("click", async () => {
+      const next = prompt("New title:", convo.title || "");
+      if (!next?.trim()) return;
+      await adminFetch(`/admin/conversations/${convo.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next.trim() }),
+      });
+      title.textContent = next.trim();
+    });
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "danger";
+    del.textContent = "Delete";
+    del.addEventListener("click", async () => {
+      if (!confirm(`Delete "${convo.title || "Untitled"}" and all its messages?`)) return;
+      await adminFetch(`/admin/conversations/${convo.id}`, { method: "DELETE" });
+      item.remove();
+    });
+    actions.append(rename, del);
+    item.append(info, actions, detail);
+    list.appendChild(item);
+  });
+  body.appendChild(list);
+}
+
+async function renderAdminUsers(body) {
+  const data = await adminFetch("/admin/users");
+  body.innerHTML = `
+    <div class="admin-section">
+      <h3>Demo accounts (${(data.demo_users || []).length})</h3>
+      <div class="admin-log-list" id="adminDemoUsers"></div>
+    </div>
+    <div class="admin-section">
+      <h3>Supabase auth</h3>
+      <div class="admin-log-list">
+        <div class="admin-log-item"><time>users</time>${
+          data.supabase_users ? `${data.supabase_users.length} listed` : "Unavailable (needs service key or migration)"
+        }</div>
+        ${(data.supabase_users || []).slice(0, 20).map((u) => `
+          <div class="admin-log-item"><time>user</time>${adminEsc(u.email || u.id)}</div>`).join("")}
+      </div>
+    </div>
+  `;
+  const list = body.querySelector("#adminDemoUsers");
+  (data.demo_users || []).forEach((u) => {
+    const row = document.createElement("div");
+    row.className = "admin-log-item";
+    const when = document.createElement("time");
+    when.textContent = u.role || "user";
+    const txt = document.createElement("span");
+    txt.textContent = `${u.name} (${u.email}) — ${u.conversations} chats, ${u.messages} msgs, ${u.memories} memories`;
+    row.append(when, txt);
+    list.appendChild(row);
+  });
+  if (!data.demo_users?.length) {
+    list.innerHTML = '<div class="admin-log-item"><time>—</time>No demo accounts.</div>';
+  }
+}
+
+function renderAdminControls(body, stats) {
+  const maintenance = !!stats.maintenance?.enabled;
+  const announcement = stats.announcement?.text || "";
+  body.innerHTML = "";
+  const maintSection = document.createElement("div");
+  maintSection.className = "admin-section";
+  const maintTitle = document.createElement("h3");
+  maintTitle.textContent = "Maintenance mode";
+  const maintBtn = document.createElement("button");
+  maintBtn.type = "button";
+  maintBtn.className = `admin-control-btn${maintenance ? " danger" : ""}`;
+  const paintMaint = (on) => {
+    maintBtn.textContent = on ? "Disable maintenance" : "Enable maintenance";
+    maintNote.textContent = on
+      ? "ON — only admins can chat right now."
+      : "Off — everyone can chat.";
+  };
+  const maintNote = document.createElement("p");
+  maintNote.className = "dropdown-hint";
+  let maintOn = maintenance;
+  paintMaint(maintOn);
+  maintBtn.addEventListener("click", async () => {
+    const next = !maintOn;
+    await adminFetch("/admin/maintenance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: next }),
+    });
+    maintOn = next;
+    stats.maintenance = { enabled: next };
+    paintMaint(next);
+  });
+  maintSection.append(maintTitle, maintBtn, maintNote);
+
+  const noteSection = document.createElement("div");
+  noteSection.className = "admin-section";
+  const noteTitle = document.createElement("h3");
+  noteTitle.textContent = "Announcement banner";
+  const noteInput = document.createElement("textarea");
+  noteInput.className = "memory-input";
+  noteInput.rows = 2;
+  noteInput.maxLength = 300;
+  noteInput.placeholder = "Shown to everyone at the top of the app…";
+  noteInput.value = announcement;
+  const noteRow = document.createElement("div");
+  noteRow.className = "admin-row-actions";
+  const publish = document.createElement("button");
+  publish.type = "button";
+  publish.textContent = "Publish";
+  publish.addEventListener("click", async () => {
+    if (!noteInput.value.trim()) return;
+    const data = await adminFetch("/admin/announcement", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: noteInput.value.trim() }),
+    });
+    stats.announcement = data;
+    showComposerToast("Announcement published");
+    refreshAnnouncement();
+  });
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "danger";
+  clear.textContent = "Clear";
+  clear.addEventListener("click", async () => {
+    await adminFetch("/admin/announcement", { method: "DELETE" });
+    noteInput.value = "";
+    stats.announcement = { text: "" };
+    refreshAnnouncement();
+  });
+  noteRow.append(publish, clear);
+  noteSection.append(noteTitle, noteInput, noteRow);
+  body.append(maintSection, noteSection);
+}
+
+async function renderAdminLogs(body) {
+  const data = await adminFetch("/admin/logs");
+  body.innerHTML = "";
+  const toolbar = document.createElement("div");
+  toolbar.className = "admin-toolbar";
+  const refresh = document.createElement("button");
+  refresh.type = "button";
+  refresh.textContent = "Refresh";
+  refresh.addEventListener("click", () => renderAdminLogs(body));
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.className = "danger";
+  clear.textContent = "Clear logs";
+  clear.addEventListener("click", async () => {
+    if (!confirm("Clear all admin logs?")) return;
+    await adminFetch("/admin/logs", { method: "DELETE" });
+    renderAdminLogs(body);
+  });
+  toolbar.append(refresh, clear);
+  body.appendChild(toolbar);
+  const list = document.createElement("div");
+  list.className = "admin-log-list";
+  (data.logs || []).slice().reverse().forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "admin-log-item";
+    const when = document.createElement("time");
+    when.textContent = (item.time || "").slice(11, 19) || item.time || "";
+    const txt = document.createElement("span");
+    txt.textContent = item.message || "";
+    row.append(when, txt);
+    list.appendChild(row);
+  });
+  if (!data.logs?.length) {
+    list.innerHTML = '<div class="admin-log-item"><time>—</time>No logs yet.</div>';
+  }
+  body.appendChild(list);
+}
+
+async function refreshAnnouncement() {
+  const banner = document.getElementById("announceBanner");
+  if (!banner) return;
+  try {
+    const res = await fetch(`${apiBaseUrl}/announcement`);
+    const data = await res.json().catch(() => ({}));
+    if (data?.text) {
+      banner.textContent = data.text;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+  } catch {
+    banner.hidden = true;
+  }
 }
 
 function closeDeveloperDashboard() {
@@ -3876,4 +4194,6 @@ initializeSettingsPanel();
 initializeAuthScreen();
 initializeAuth();
 bootReminders();
+refreshAnnouncement();
+setInterval(refreshAnnouncement, 60000);
 focusInput();
