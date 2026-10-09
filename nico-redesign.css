@@ -297,6 +297,19 @@ body .conversation-menu-item span:last-child{overflow:hidden;text-overflow:ellip
 .badge-tester{background:linear-gradient(135deg,rgba(167,228,111,.16),rgba(114,241,197,.24));border:1px solid rgba(167,228,111,.52);color:#e4ffd2}
 .badge-majorsupporter{background:linear-gradient(135deg,rgba(255,95,168,.18),rgba(124,92,255,.28));border:1px solid rgba(255,95,168,.55);color:#ffd6ec}
 .badge-supporter{background:linear-gradient(135deg,rgba(98,184,255,.16),rgba(98,184,255,.28));border:1px solid rgba(98,184,255,.52);color:#d8ecff}
+.earned-badge button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:.9rem;line-height:1;padding:0 0 0 4px;opacity:.8}
+.earned-badge button:hover{opacity:1}
+.admin-user-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel);flex-wrap:wrap}
+.admin-user-info{flex:1 1 180px;min-width:0;display:flex;flex-direction:column;gap:1px}
+.admin-user-info strong{font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-user-info small{opacity:.6;font-size:.66rem}
+.admin-user-badges{display:flex;gap:6px;flex-wrap:wrap}
+.admin-user-controls{display:flex;gap:6px;align-items:center;margin-left:auto}
+.admin-user-controls select{border-radius:9px;border:1px solid var(--line);background:var(--panel);color:inherit;font:600 .7rem var(--ui);padding:.35rem .5rem;max-width:130px}
+.admin-user-controls select option{background:#161026;color:#f1ecff}
+.admin-user-controls button{border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;font:600 .7rem var(--ui);padding:.35rem .8rem;cursor:pointer}
+.admin-user-controls button:hover:not(:disabled){border-color:var(--accent)}
+.admin-user-controls button:disabled{opacity:.4;cursor:default}
 .admin-toolbar select.admin-search{max-width:150px}
 .admin-toolbar select.admin-search option{background:#161026;color:#f1ecff}
 

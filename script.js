@@ -4129,8 +4129,101 @@ async function renderAdminChats(body, query = "") {
   body.appendChild(list);
 }
 
+const ADMIN_BADGE_OPTIONS = ["tester", "major_supporter", "supporter"];
+const ADMIN_BADGE_LABELS = {
+  tester: "Tester",
+  major_supporter: "Major Supporter",
+  supporter: "Supporter",
+};
+
 async function renderAdminUsers(body) {
-  const data = await adminFetch("/admin/users");
+  const [data, grantData] = await Promise.all([
+    adminFetch("/admin/users"),
+    adminFetch("/admin/badges").catch(() => ({ badges: [] })),
+  ]);
+  const heldByUser = new Map();
+  (grantData.badges || []).forEach((entry) => {
+    if (!heldByUser.has(entry.user_id)) heldByUser.set(entry.user_id, new Set());
+    heldByUser.get(entry.user_id).add(entry.badge);
+  });
+  const refreshUsers = () => renderAdminUsers(body);
+  const badgeChip = (badge, email) => {
+    const chip = document.createElement("span");
+    chip.className = `earned-badge badge-${String(badge).replace(/[^a-z]/g, "")}`;
+    chip.textContent = ADMIN_BADGE_LABELS[badge] || badge;
+    const x = document.createElement("button");
+    x.type = "button";
+    x.textContent = "×";
+    x.title = "Revoke";
+    x.setAttribute("aria-label", `Revoke ${chip.textContent} from ${email}`);
+    x.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await adminFetch("/admin/badges", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, badge }),
+        });
+        refreshUsers();
+      } catch (error) {
+        showComposerToast(error.message);
+      }
+    });
+    chip.appendChild(x);
+    return chip;
+  };
+  const grantControls = (email, held) => {
+    const wrap = document.createElement("span");
+    wrap.className = "admin-user-controls";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `Badge for ${email}`);
+    let open = true;
+    ADMIN_BADGE_OPTIONS.forEach((b) => {
+      if (held.has(b)) return;
+      const opt = document.createElement("option");
+      opt.value = b;
+      opt.textContent = ADMIN_BADGE_LABELS[b];
+      select.appendChild(opt);
+      open = false;
+    });
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Grant";
+    btn.disabled = open && held.size > 0;
+    btn.addEventListener("click", async () => {
+      if (!select.value) return;
+      try {
+        await adminFetch("/admin/badges", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, badge: select.value }),
+        });
+        refreshUsers();
+      } catch (error) {
+        showComposerToast(error.message);
+      }
+    });
+    wrap.append(select, btn);
+    return wrap;
+  };
+  const userRow = (id, title, sub, email) => {
+    const row = document.createElement("div");
+    row.className = "admin-user-row";
+    const info = document.createElement("div");
+    info.className = "admin-user-info";
+    const strong = document.createElement("strong");
+    strong.textContent = title;
+    const small = document.createElement("small");
+    small.textContent = sub;
+    info.append(strong, small);
+    const chips = document.createElement("span");
+    chips.className = "admin-user-badges";
+    (heldByUser.get(String(id)) || new Set()).forEach((b) =>
+      chips.appendChild(badgeChip(b, email)),
+    );
+    row.append(info, chips, grantControls(email, heldByUser.get(String(id)) || new Set()));
+    return row;
+  };
   body.innerHTML = "";
   const badgeSection = document.createElement("div");
   badgeSection.className = "admin-section";
@@ -4179,7 +4272,7 @@ async function renderAdminUsers(body) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: entry.email, badge: entry.badge }),
           });
-          paintBadges();
+          refreshUsers();
         });
         row.append(when, txt, revoke);
         badgeList.appendChild(row);
@@ -4200,7 +4293,7 @@ async function renderAdminUsers(body) {
         body: JSON.stringify({ email: emailInput.value.trim(), badge: badgeSelect.value }),
       });
       emailInput.value = "";
-      paintBadges();
+      refreshUsers();
     } catch (error) {
       showComposerToast(error.message);
     }
@@ -4221,25 +4314,39 @@ async function renderAdminUsers(body) {
         <div class="admin-log-item"><time>users</time>${
           data.supabase_users ? `${data.supabase_users.length} listed` : "Unavailable (needs service key or migration)"
         }</div>
-        ${(data.supabase_users || []).slice(0, 20).map((u) => `
-          <div class="admin-log-item"><time>user</time>${adminEsc(u.email || u.id)}</div>`).join("")}
       </div>
+      <div class="admin-log-list" id="adminSupabaseUsers"></div>
     </div>
   `;
   while (rest.firstChild) body.appendChild(rest.firstChild);
   const list = body.querySelector("#adminDemoUsers");
   (data.demo_users || []).forEach((u) => {
-    const row = document.createElement("div");
-    row.className = "admin-log-item";
-    const when = document.createElement("time");
-    when.textContent = u.role || "user";
-    const txt = document.createElement("span");
-    txt.textContent = `${u.name} (${u.email}) — ${u.conversations} chats, ${u.messages} msgs, ${u.memories} memories`;
-    row.append(when, txt);
-    list.appendChild(row);
+    list.appendChild(
+      userRow(
+        u.id,
+        `${u.name} (${u.email})`,
+        `${u.conversations} chats · ${u.messages} msgs · ${u.memories} memories`,
+        u.email,
+      ),
+    );
   });
   if (!data.demo_users?.length) {
     list.innerHTML = '<div class="admin-log-item"><time>—</time>No demo accounts.</div>';
+  }
+  const supList = body.querySelector("#adminSupabaseUsers");
+  (data.supabase_users || []).slice(0, 50).forEach((u) => {
+    supList.appendChild(
+      userRow(u.id, u.email || u.id, String(u.created_at || "").slice(0, 10), u.email || u.id),
+    );
+  });
+  if (!data.supabase_users?.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-log-item";
+    empty.innerHTML = "<time>—</time>";
+    const txt = document.createElement("span");
+    txt.textContent = "Unavailable (needs service key or migration)";
+    empty.appendChild(txt);
+    supList.appendChild(empty);
   }
 }
 

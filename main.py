@@ -1045,29 +1045,38 @@ async def zen_chat_once(model: str, messages: list, max_tokens: int = 60):
     return (((obj.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
 
 
-async def generate_title(text: str, allow_zen: bool = False):
+async def generate_title(text: str, allow_zen: bool = False, prefer_zen: bool = False):
   prompt = (
     "Summarize this query into a 3 to 5 word title. Do not use quotes or"
     f" punctuation: '{text}'"
   )
-  if groq_client:
-    try:
-      title_res = await groq_client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="openai/gpt-oss-120b",
+
+  async def via_zen():
+    return (
+      await zen_chat_once(
+        OPENCODE_MODELS[0], [{"role": "user", "content": prompt}]
       )
-      return (title_res.choices[0].message.content or "").strip() or "Untitled Chat"
-    except Exception:
-      pass
-  if OPENCODE_API_KEY and OPENCODE_MODELS and allow_zen:
+    ).strip() or "Untitled Chat"
+
+  async def via_groq():
+    title_res = await groq_client.chat.completions.create(
+      messages=[{"role": "user", "content": prompt}],
+      model="openai/gpt-oss-120b",
+    )
+    return (title_res.choices[0].message.content or "").strip() or "Untitled Chat"
+
+  attempts = []
+  if allow_zen and prefer_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
+    attempts.append(via_zen)
+  if groq_client:
+    attempts.append(via_groq)
+  if allow_zen and not prefer_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
+    attempts.append(via_zen)
+  for attempt in attempts:
     try:
-      return (
-        await zen_chat_once(
-          OPENCODE_MODELS[0], [{"role": "user", "content": prompt}]
-        )
-      ).strip() or "Untitled Chat"
+      return await attempt()
     except Exception:
-      pass
+      continue
   return "Untitled Chat"
 
 
@@ -1589,7 +1598,9 @@ async def chat_stream(
       user_conversations = DEMO_CONVERSATIONS.setdefault(user_id, {})
       user_messages = DEMO_MESSAGES.setdefault(user_id, {})
       if request.conversation_id not in user_conversations:
-        generated_title = await generate_title(request.message, can_use_zen)
+        generated_title = await generate_title(
+          request.message, can_use_zen, prefer_zen=can_use_zen
+        )
         user_conversations[request.conversation_id] = {
             "id": request.conversation_id,
             "title": generated_title,
@@ -1615,7 +1626,9 @@ async def chat_stream(
       )
 
       if not conv_check.data:
-        generated_title = await generate_title(request.message, can_use_zen)
+        generated_title = await generate_title(
+          request.message, can_use_zen, prefer_zen=can_use_zen
+        )
 
         supabase_client.table("conversations").insert({
             "id": request.conversation_id,
@@ -1799,13 +1812,16 @@ async def chat_stream(
         models_to_try = []
       else:
         models_to_try = []
-        if groq_client:
-          models_to_try.append((
+        groq_entry = (
+          [(
             "groq",
             "openai/gpt-oss-20b"
             if request.settings.get("model") == "light"
             else "openai/gpt-oss-120b",
-          ))
+          )]
+          if groq_client
+          else []
+        )
         client_ip = (
           fastapi_request.client.host
           if fastapi_request and fastapi_request.client
@@ -1816,8 +1832,14 @@ async def chat_stream(
           bool(OPENCODE_API_KEY and OPENCODE_MODELS) and can_use_zen
         )
         zen_skipped_quota = zen_available and not zen_quota_ok(zen_key)
-        if zen_available and not zen_skipped_quota:
-          models_to_try += [("zen", name) for name in OPENCODE_MODELS]
+        zen_entries = (
+          [("zen", name) for name in OPENCODE_MODELS]
+          if zen_available and not zen_skipped_quota
+          else []
+        )
+        # Badged accounts lead with Zen (bigger context); Groq is their
+        # fallback. Everyone else is Groq-only.
+        models_to_try = zen_entries + groq_entry if can_use_zen else groq_entry
       last_error = None
       zen_billed = False
 
