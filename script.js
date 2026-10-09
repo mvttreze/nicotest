@@ -57,6 +57,8 @@ const defaultSettings = {
   sound: false,
   avatar: "✦",
   customBackgroundImage: "",
+  wake: false,
+  briefCity: "",
 };
 let settings = { ...defaultSettings };
 
@@ -218,6 +220,7 @@ function applySettings() {
   }
   updateNicoIcon();
   updateNicoFaces();
+  syncWakeWord();
 }
 
 function readCustomBackground(file) {
@@ -600,6 +603,7 @@ function setupVoiceRecognition() {
     }
     autoGrowComposer();
     if (userInput.value.trim()) sendMessage();
+    maybeResumeWake();
   };
 
   recognition.onerror = (event) => {
@@ -2146,9 +2150,684 @@ if (userInput) {
 document.addEventListener("paste", addPastedImages, true);
 initComposerDragDrop();
 
+/* ================= Jarvis pack: reminders, memory, briefing, wake word ================= */
+const REMINDER_KEY = "nico_reminders";
+const reminderTimers = new Map();
+
+function readReminders() {
+  try {
+    return JSON.parse(localStorage.getItem(REMINDER_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeReminders(list) {
+  localStorage.setItem(REMINDER_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return "due now";
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `in ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `in ${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `in ${h}h ${m % 60}m`;
+  return `in ${Math.floor(h / 24)}d`;
+}
+
+function fmtWhen(ts) {
+  const diff = ts - Date.now();
+  const d = new Date(ts);
+  const t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (diff < 12 * 36e5) return fmtCountdown(diff);
+  const tom = new Date(Date.now() + 864e5);
+  if (d.toDateString() === tom.toDateString()) return `tomorrow at ${t}`;
+  if (d.toDateString() === new Date().toDateString()) return `today at ${t}`;
+  return `on ${d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })} at ${t}`;
+}
+
+function scheduleReminder(r) {
+  clearTimeout(reminderTimers.get(r.id));
+  const delay = r.dueAt - Date.now();
+  if (delay <= 0) {
+    fireReminder(r.id);
+    return;
+  }
+  if (delay > 2147483647) return; // far future: the sweep catches it later
+  reminderTimers.set(r.id, setTimeout(() => fireReminder(r.id), delay));
+}
+
+function scheduleAllReminders() {
+  readReminders()
+    .filter((r) => !r.done)
+    .forEach(scheduleReminder);
+  updateReminderBadge();
+}
+
+function fireReminder(id) {
+  const list = readReminders();
+  const r = list.find((x) => x.id === id && !x.done);
+  if (!r) {
+    updateReminderBadge();
+    return;
+  }
+  r.done = true;
+  r.firedAt = Date.now();
+  writeReminders(list);
+  scheduleAllReminders();
+  playCompletionChime();
+  showComposerToast(`⏰ ${r.label}`);
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Nico reminder", { body: r.label });
+    }
+  } catch {}
+  appendMessage("assistant", `⏰ **Reminder:** ${r.label}`, []);
+  if (currentUser && !authClient) {
+    appendLocalConversationMessage(currentConversationId, "assistant", `⏰ Reminder: ${r.label}`);
+  }
+  renderReminderPanel();
+}
+
+function addReminder(label, dueAt) {
+  const list = readReminders();
+  const r = {
+    id: `rem-${Date.now().toString(36)}`,
+    label,
+    dueAt,
+    done: false,
+    createdAt: Date.now(),
+  };
+  list.push(r);
+  writeReminders(list);
+  scheduleReminder(r);
+  updateReminderBadge();
+  renderReminderPanel();
+  return r;
+}
+
+function cancelReminder(id) {
+  writeReminders(readReminders().filter((r) => r.id !== id));
+  clearTimeout(reminderTimers.get(id));
+  reminderTimers.delete(id);
+  updateReminderBadge();
+  renderReminderPanel();
+}
+
+const DURATION_RE = "(\\d+\\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d))";
+const UNIT_MS = {
+  s: 1e3, sec: 1e3, second: 1e3,
+  m: 6e4, min: 6e4, minute: 6e4,
+  h: 36e5, hr: 36e5, hour: 36e5,
+  d: 864e5, day: 864e5,
+};
+
+function parseDurationToMs(text) {
+  const m = String(text || "").match(
+    /(\d+)\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d)\b/i,
+  );
+  if (!m) return 0;
+  const key = m[2].toLowerCase().replace(/s$/, "");
+  return (UNIT_MS[key] || 0) * parseInt(m[1], 10);
+}
+
+function parseClockTime(expr, ref) {
+  const lower = String(expr || "").toLowerCase();
+  const tomorrow = /\btomorrow\b/.test(lower);
+  let h;
+  let min = 0;
+  if (/\bnoon\b/.test(lower)) {
+    h = 12;
+  } else if (/\bmidnight\b/.test(lower)) {
+    h = 0;
+  } else {
+    const m = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (!m) return null;
+    h = parseInt(m[1], 10);
+    min = parseInt(m[2] || "0", 10);
+    const ap = m[3];
+    if (ap === "pm" && h < 12) h += 12;
+    if (ap === "am" && h === 12) h = 0;
+    if (h > 23 || min > 59) return null;
+  }
+  const d = new Date(ref.getTime());
+  d.setHours(h, min, 0, 0);
+  if (tomorrow) d.setDate(d.getDate() + 1);
+  else if (d.getTime() <= ref.getTime()) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
+function capKind(kind) {
+  return kind.charAt(0).toUpperCase() + kind.slice(1);
+}
+
+function parseReminderCommand(raw) {
+  const text = raw.trim();
+  let m;
+  if ((m = text.match(new RegExp(`^remind me to (.+?) in ${DURATION_RE}\\b`, "i")))) {
+    const ms = parseDurationToMs(m[2]);
+    if (!ms) return null;
+    return { label: m[1].trim(), dueAt: Date.now() + ms };
+  }
+  if ((m = text.match(new RegExp(`^remind me in ${DURATION_RE}(?: to (.+))?$`, "i")))) {
+    const ms = parseDurationToMs(m[1]);
+    if (!ms) return null;
+    return { label: (m[2] || "Reminder").trim(), dueAt: Date.now() + ms };
+  }
+  if ((m = text.match(/^remind me to (.+?) (?:at|on) (.+)$/i))) {
+    const at = parseClockTime(m[2], new Date());
+    if (at == null) return { error: true };
+    return { label: m[1].trim(), dueAt: at };
+  }
+  if ((m = text.match(/^remind me (?:at|on) (.+?)(?: to (.+))?$/i))) {
+    const at = parseClockTime(m[1], new Date());
+    if (at == null) return { error: true };
+    return { label: (m[2] || "Reminder").trim(), dueAt: at };
+  }
+  if ((m = text.match(new RegExp(`^in ${DURATION_RE} remind me to (.+)$`, "i")))) {
+    const ms = parseDurationToMs(m[1]);
+    if (!ms) return null;
+    return { label: m[2].trim(), dueAt: Date.now() + ms };
+  }
+  if ((m = text.match(/^set an? (alarm|timer|reminder)(?: for (.+))?$/i))) {
+    const kind = m[1].toLowerCase();
+    const rest = (m[2] || "").trim();
+    if (!rest) return { error: true };
+    const durM = rest.match(
+      /(\d+\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d))/i,
+    );
+    if (durM) {
+      const ms = parseDurationToMs(durM[1]);
+      if (!ms) return { error: true };
+      const label = rest
+        .replace(durM[1], "")
+        .replace(/^(for|to)\s+/i, "")
+        .trim();
+      return { label: label || capKind(kind), dueAt: Date.now() + ms };
+    }
+    const at = parseClockTime(rest, new Date());
+    if (at == null) return { error: true };
+    const label = rest
+      .replace(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?|noon|midnight|tomorrow)/gi, "")
+      .trim()
+      .replace(/^(for|to|at|on)\s+/i, "")
+      .trim();
+    return { label: label || capKind(kind), dueAt: at };
+  }
+  if (/^remind me to (.+)$/i.test(text)) return { needTime: true };
+  if (/^(remind me|set (an? )?(alarm|timer|reminder))\b/i.test(text)) return { error: true };
+  return null;
+}
+
+async function handleReminderSend(raw) {
+  const parsed = parseReminderCommand(raw);
+  if (!parsed) return false;
+  appendMessage("user", raw, []);
+  if (parsed.error) {
+    appendMessage("assistant", "Got it — what time? Try `in 20 minutes` or `at 7pm`.", []);
+    return true;
+  }
+  if (parsed.needTime) {
+    appendMessage(
+      "assistant",
+      "Sure — when should I remind you? (e.g. `in 20 minutes` or `tomorrow at 8am`)",
+      [],
+    );
+    return true;
+  }
+  if ("Notification" in window && Notification.permission === "default") {
+    try {
+      await Notification.requestPermission();
+    } catch {}
+  }
+  const r = addReminder(parsed.label, parsed.dueAt);
+  appendMessage("assistant", `Done — I'll remind you ${fmtWhen(r.dueAt)}: **${r.label}**`, []);
+  return true;
+}
+
+function updateReminderBadge() {
+  const pending = readReminders().filter((r) => !r.done).length;
+  const badge = document.getElementById("reminderBadge");
+  if (badge) {
+    badge.textContent = pending > 9 ? "9+" : String(pending);
+    badge.hidden = pending === 0;
+  }
+}
+
+function renderReminderPanel() {
+  const panel = document.getElementById("reminderDropdown");
+  if (!panel) return;
+  const pending = readReminders()
+    .filter((r) => !r.done)
+    .sort((a, b) => a.dueAt - b.dueAt);
+  panel.innerHTML = "";
+  const head = document.createElement("p");
+  head.className = "composer-menu-heading";
+  head.textContent = "Reminders";
+  panel.appendChild(head);
+  if (!pending.length) {
+    const empty = document.createElement("p");
+    empty.className = "dropdown-hint";
+    empty.textContent = "No reminders — try “remind me in 20 minutes”";
+    panel.appendChild(empty);
+    return;
+  }
+  pending.forEach((r) => {
+    const row = document.createElement("div");
+    row.className = "reminder-row";
+    const txt = document.createElement("span");
+    txt.className = "reminder-text";
+    const strong = document.createElement("strong");
+    strong.textContent = r.label;
+    const small = document.createElement("small");
+    small.textContent = fmtCountdown(r.dueAt - Date.now());
+    txt.append(strong, small);
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "reminder-del";
+    del.textContent = "×";
+    del.title = "Cancel reminder";
+    del.setAttribute("aria-label", `Cancel reminder: ${r.label}`);
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      cancelReminder(r.id);
+    });
+    row.append(txt, del);
+    panel.appendChild(row);
+  });
+}
+
+function toggleReminderPanel(force) {
+  const panel = document.getElementById("reminderDropdown");
+  const btn = document.getElementById("reminderBtn");
+  if (!panel) return;
+  const open = force !== undefined ? force : !panel.classList.contains("open");
+  addFilesDropdown?.classList.remove("open");
+  renderReminderPanel();
+  panel.classList.toggle("open", open);
+  panel.setAttribute("aria-hidden", String(!open));
+  btn?.setAttribute("aria-expanded", String(open));
+}
+
+function bootReminders() {
+  scheduleAllReminders();
+  renderReminderPanel();
+  document.getElementById("reminderBtn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleReminderPanel();
+  });
+  document.addEventListener("click", (event) => {
+    if (
+      !event.target.closest("#reminderBtn") &&
+      !event.target.closest("#reminderDropdown")
+    ) {
+      toggleReminderPanel(false);
+    }
+  });
+  // Sweep for reminders missed while asleep; keeps countdowns fresh.
+  setInterval(() => {
+    readReminders()
+      .filter((r) => !r.done && r.dueAt <= Date.now())
+      .forEach((r) => fireReminder(r.id));
+    updateReminderBadge();
+  }, 30000);
+  scheduleAllReminders();
+}
+
+/* ---------- long-term memory (client) ---------- */
+async function loadMemoryList() {
+  const box = document.getElementById("memoryList");
+  if (!box) return;
+  const count = document.getElementById("memoryCount");
+  box.innerHTML = `<p class="dropdown-hint">Loading…</p>`;
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/memory`);
+    if (!res.ok) {
+      throw new Error(
+        (await res.json().catch(() => ({}))).detail || "Could not load memory",
+      );
+    }
+    const items = await res.json();
+    if (count) count.textContent = `${items.length}/50`;
+    box.innerHTML = "";
+    if (!items.length) {
+      box.innerHTML = `<p class="dropdown-hint">Nothing stored yet — say “remember that…”</p>`;
+      return;
+    }
+    items.forEach((m) => {
+      const row = document.createElement("div");
+      row.className = "memory-row";
+      const txt = document.createElement("span");
+      txt.textContent = m.content;
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "memory-del";
+      del.textContent = "×";
+      del.title = "Forget";
+      del.setAttribute("aria-label", `Forget: ${m.content}`);
+      del.addEventListener("click", async () => {
+        try {
+          await apiFetch(`${apiBaseUrl}/memory/${m.id}`, { method: "DELETE" });
+          loadMemoryList();
+        } catch {
+          showComposerToast("Couldn't delete that memory");
+        }
+      });
+      row.append(txt, del);
+      box.appendChild(row);
+    });
+  } catch (err) {
+    if (count) count.textContent = "";
+    box.innerHTML = `<p class="dropdown-hint">${
+      err?.message === "Sign-in required"
+        ? "Sign in to use long-term memory."
+        : "Couldn't load memory."
+    }</p>`;
+  }
+}
+
+async function handleRememberCommand(raw) {
+  const m = raw.trim().match(/^remember(?: that| this)?\s+(.+)$/i);
+  if (!m) return false;
+  const content = m[1].trim();
+  if (content.length < 3) return false;
+  appendMessage("user", raw, []);
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/memory`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    if (!res.ok) {
+      throw new Error(
+        (await res.json().catch(() => ({}))).detail || "Couldn't save that",
+      );
+    }
+    appendMessage("assistant", "Got it — I'll remember that.", []);
+    loadMemoryList();
+  } catch (err) {
+    appendMessage(
+      "assistant",
+      err?.message === "Sign-in required"
+        ? "I can only keep long-term memories once you're signed in."
+        : "I couldn't save that — try again.",
+      [],
+    );
+  }
+  return true;
+}
+
+async function handleRecallCommand(raw) {
+  if (
+    !/^(what do you remember|list (your )?memories|show (your )?memories|my memories)\b/i.test(
+      raw.trim(),
+    )
+  ) {
+    return false;
+  }
+  appendMessage("user", raw, []);
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/memory`);
+    if (!res.ok) throw new Error("load");
+    const items = await res.json();
+    appendMessage(
+      "assistant",
+      items.length
+        ? `Here's what I remember:\n${items.map((i) => `- ${i.content}`).join("\n")}`
+        : "Nothing stored yet — tell me something with “remember that…”.",
+      [],
+    );
+  } catch {
+    appendMessage("assistant", "Sign in first and I'll keep memories for you.", []);
+  }
+  return true;
+}
+
+/* ---------- morning briefing (no keys needed) ---------- */
+function wmoText(code) {
+  const c = Number(code);
+  if (c === 0) return { icon: "☀️", label: "clear sky" };
+  if (c <= 2) return { icon: "🌤️", label: "mostly clear" };
+  if (c === 3) return { icon: "☁️", label: "overcast" };
+  if (c <= 48) return { icon: "🌫️", label: "foggy" };
+  if (c <= 57) return { icon: "🌦️", label: "drizzle" };
+  if (c <= 67) return { icon: "🌧️", label: "rain" };
+  if (c <= 77) return { icon: "🌨️", label: "snow" };
+  if (c <= 82) return { icon: "🌦️", label: "showers" };
+  if (c <= 86) return { icon: "🌨️", label: "snow showers" };
+  return { icon: "⛈️", label: "thunderstorms" };
+}
+
+async function runBriefing() {
+  appendMessage("user", "Morning briefing", []);
+  const lines = [];
+  const now = new Date();
+  lines.push(
+    `**${now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} — ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}**`,
+  );
+  const city = (settings.briefCity || "").trim();
+  if (city) {
+    try {
+      const geo = await (
+        await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`,
+        )
+      ).json();
+      const place = geo?.results?.[0];
+      if (!place) throw new Error("no-place");
+      const wx = await (
+        await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto`,
+        )
+      ).json();
+      const w = wmoText(wx.current.weather_code);
+      lines.push(
+        `\n**Weather in ${place.name}** — ${w.icon} ${Math.round(wx.current.temperature_2m)}°C, ${w.label}. High ${Math.round(wx.daily.temperature_2m_max[0])}° / low ${Math.round(wx.daily.temperature_2m_min[0])}°.`,
+      );
+    } catch {
+      lines.push(
+        `\n**Weather** — couldn't load “${city}”. Check the city name in Settings → Behavior.`,
+      );
+    }
+  } else {
+    lines.push(`\n**Weather** — set your city in Settings → Behavior to get forecasts.`);
+  }
+  const todays = readReminders()
+    .filter((r) => !r.done && new Date(r.dueAt).toDateString() === now.toDateString())
+    .sort((a, b) => a.dueAt - b.dueAt);
+  lines.push(
+    todays.length
+      ? `\n**Today's reminders**\n${todays.map((r) => `- ${r.label} (${fmtWhen(r.dueAt)})`).join("\n")}`
+      : `\n**Reminders** — nothing due today.`,
+  );
+  try {
+    const ids = await (
+      await fetch("https://hacker-news.firebaseio.com/v0/topstories.json")
+    ).json();
+    const stories = await Promise.all(
+      ids.slice(0, 5).map(async (id) => {
+        try {
+          return await (
+            await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)
+          ).json();
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const titles = stories.filter(Boolean).map((s, i) => `${i + 1}. ${s.title}`);
+    lines.push(
+      titles.length
+        ? `\n**Tech headlines**\n${titles.join("\n")}`
+        : `\n**Tech headlines** — unavailable right now.`,
+    );
+  } catch {
+    lines.push(`\n**Tech headlines** — unavailable right now.`);
+  }
+  appendMessage("assistant", lines.join("\n"), []);
+}
+
+/* ---------- wake word ("Hey Nico") ---------- */
+let wakeRecognition = null;
+let wakeSuspended = false;
+
+function updateMicWakeState() {
+  if (micBtn) {
+    micBtn.classList.toggle("wake-on", !!settings.wake && voiceSupported());
+  }
+}
+
+function syncWakeWord() {
+  updateMicWakeState();
+  if (settings.wake && !wakeRecognition) startWakeLoop();
+  else if (!settings.wake && wakeRecognition) stopWakeLoop();
+}
+
+function startWakeLoop() {
+  if (!voiceSupported() || !window.isSecureContext || wakeRecognition) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  wakeRecognition = new SR();
+  wakeRecognition.continuous = !isMobileVoice;
+  wakeRecognition.interimResults = true;
+  wakeRecognition.maxAlternatives = 1;
+  wakeRecognition.lang = "en-US";
+  wakeRecognition.onresult = (event) => {
+    let t = "";
+    for (let i = 0; i < event.results.length; ++i) {
+      t += event.results[i][0].transcript;
+    }
+    if (/hey[\s,\-]*nico|ok[\s,\-]*nico/i.test(t)) triggerVoiceCapture();
+  };
+  wakeRecognition.onend = () => {
+    wakeRecognition = null;
+    updateMicWakeState();
+    if (settings.wake && !wakeSuspended && !isListening) {
+      try {
+        startWakeLoop();
+      } catch {
+        setTimeout(() => {
+          if (settings.wake && !wakeSuspended && !isListening) startWakeLoop();
+        }, 1500);
+      }
+    }
+  };
+  wakeRecognition.onerror = (event) => {
+    const kind = event?.error || "";
+    if (kind === "not-allowed" || kind === "service-not-allowed") {
+      settings.wake = false;
+      saveSettings();
+      stopWakeLoop();
+      const box = document.getElementById("wakeSetting");
+      if (box) box.checked = false;
+      showComposerToast("Wake word needs mic permission — turned off");
+    }
+  };
+  try {
+    wakeRecognition.start();
+    updateMicWakeState();
+  } catch {
+    wakeRecognition = null;
+  }
+}
+
+function stopWakeLoop() {
+  if (!wakeRecognition) return;
+  try {
+    wakeRecognition.stop();
+  } catch {}
+  wakeRecognition = null;
+  updateMicWakeState();
+}
+
+function triggerVoiceCapture() {
+  if (isListening || !recognition) return;
+  wakeSuspended = true;
+  stopWakeLoop();
+  playCompletionChime();
+  showComposerToast("Yes? Listening…");
+  try {
+    userInput.value = "";
+    autoGrowComposer();
+    recognition.start();
+  } catch {
+    wakeSuspended = false;
+    startWakeLoop();
+  }
+}
+
+function maybeResumeWake() {
+  wakeSuspended = false;
+  updateMicWakeState();
+  if (settings.wake && !wakeRecognition && !isListening) {
+    setTimeout(() => {
+      if (settings.wake && !wakeSuspended && !isListening) startWakeLoop();
+    }, 1500);
+  }
+}
+
+/* ---------- local command dispatcher (before the backend) ---------- */
+async function maybeHandleLocalCommand(raw) {
+  const text = (raw || "").trim();
+  if (!text) return false;
+  if (
+    /^(remind me|set an? (alarm|timer|reminder)|in \d+\s*\w+ remind me)\b/i.test(text)
+  ) {
+    return await handleReminderSend(text);
+  }
+  if (/^cancel all reminders$/i.test(text)) {
+    appendMessage("user", text, []);
+    const n = readReminders().filter((r) => !r.done).length;
+    writeReminders([]);
+    reminderTimers.forEach((t) => clearTimeout(t));
+    reminderTimers.clear();
+    updateReminderBadge();
+    renderReminderPanel();
+    appendMessage(
+      "assistant",
+      n ? `Cleared ${n} reminder${n === 1 ? "" : "s"}.` : "No active reminders to clear.",
+      [],
+    );
+    return true;
+  }
+  if (/^remember\s/i.test(text) && !/^remember to\b/i.test(text)) {
+    return await handleRememberCommand(text);
+  }
+  if (
+    /^(what do you remember|list (your )?memories|show (your )?memories|my memories)\b/i.test(
+      text,
+    )
+  ) {
+    return await handleRecallCommand(text);
+  }
+  const cityM = text.match(/^(?:set(?: my)? city (?:to|as) |my city is )(.{2,60})$/i);
+  if (cityM) {
+    appendMessage("user", text, []);
+    settings.briefCity = cityM[1].trim();
+    saveSettings();
+    appendMessage(
+      "assistant",
+      `City set to **${settings.briefCity}** — I'll use it for briefings.`,
+      [],
+    );
+    return true;
+  }
+  if (/^(good morning|morning|briefing|daily briefing|morning briefing)!?\s*$/i.test(text)) {
+    await runBriefing();
+    return true;
+  }
+  return false;
+}
+
 async function sendMessage() {
   const typedMessage = userInput.value.trim();
   if (!typedMessage && selectedAttachments.length === 0) return;
+  if (!selectedAttachments.length && (await maybeHandleLocalCommand(typedMessage))) {
+    userInput.value = "";
+    autoGrowComposer();
+    return;
+  }
   const attachmentRequest = await buildMessageWithAttachments(typedMessage);
   // Never silently drop the files: if nothing usable could be read, stop
   // here instead of sending a text-only message Nico will misread.
@@ -2562,6 +3241,8 @@ function initializeSettingsPanel() {
     context: document.getElementById("contextSetting"),
     sound: document.getElementById("soundSetting"),
     avatar: document.getElementById("avatarSetting"),
+    wake: document.getElementById("wakeSetting"),
+    briefCity: document.getElementById("briefCity"),
   };
 
   Object.entries(controls).forEach(([key, control]) => {
@@ -2621,9 +3302,11 @@ function initializeSettingsPanel() {
     panel.setAttribute("aria-hidden", String(!open));
     button.setAttribute("aria-expanded", String(open));
   };
-  button.addEventListener("click", () =>
-    setOpen(!panel.classList.contains("open")),
-  );
+  button.addEventListener("click", () => {
+    const willOpen = !panel.classList.contains("open");
+    setOpen(willOpen);
+    if (willOpen) loadMemoryList();
+  });
   closeButton.addEventListener("click", () => setOpen(false));
   document.addEventListener("click", (event) => {
     if (
@@ -3077,4 +3760,5 @@ ensureTypingIndicator();
 initializeSettingsPanel();
 initializeAuthScreen();
 initializeAuth();
+bootReminders();
 focusInput();

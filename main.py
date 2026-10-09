@@ -94,6 +94,8 @@ DEMO_USERS: dict[str, dict] = {}
 DEMO_SESSIONS: dict[str, str] = {}
 DEMO_CONVERSATIONS: dict[str, dict[str, dict]] = {}
 DEMO_MESSAGES: dict[str, dict[str, list[dict]]] = {}
+DEMO_MEMORIES: dict[str, list[dict]] = {}
+MEMORY_CAP = 50
 ADMIN_LOGS: list[dict] = []
 
 
@@ -753,6 +755,150 @@ def fetch_messages(conversation_id: str):
   raise HTTPException(status_code=503, detail="Could not load messages")
 
 
+def get_user_memories(user):
+  user_id = str(user.id)
+  if is_local_demo_user(user):
+    return DEMO_MEMORIES.get(user_id, [])
+  require_supabase()
+  try:
+    response = (
+        supabase_client.table("memories")
+        .select("id, content, created_at")
+        .eq("user_id", user_id)
+        .order("created_at")
+        .execute()
+    )
+    return response.data or []
+  except Exception:
+    return []
+
+
+def add_user_memory(user, content):
+  content = (content or "").strip()[:500]
+  if len(content) < 3:
+    raise HTTPException(status_code=400, detail="Memory is too short")
+  user_id = str(user.id)
+  if is_local_demo_user(user):
+    memories = DEMO_MEMORIES.setdefault(user_id, [])
+    for item in memories:
+      if item["content"].strip().lower() == content.lower():
+        return item
+    if len(memories) >= MEMORY_CAP:
+      raise HTTPException(
+        status_code=400, detail="Memory is full (50). Delete some first."
+      )
+    item = {
+      "id": str(uuid.uuid4()),
+      "content": content,
+      "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+    memories.append(item)
+    return item
+  require_supabase()
+  existing = get_user_memories(user)
+  for item in existing:
+    if (item.get("content") or "").strip().lower() == content.lower():
+      return item
+  if len(existing) >= MEMORY_CAP:
+    raise HTTPException(
+      status_code=400, detail="Memory is full (50). Delete some first."
+    )
+  try:
+    response = (
+        supabase_client.table("memories")
+        .insert({"user_id": user_id, "content": content})
+        .execute()
+    )
+    if response.data:
+      return response.data[0]
+  except Exception as error:
+    raise HTTPException(
+      status_code=503,
+      detail="Memory table is missing. Run the memories migration in Supabase, then redeploy.",
+    ) from error
+  return {"id": str(uuid.uuid4()), "content": content, "created_at": ""}
+
+
+def delete_user_memory(user, memory_id: str):
+  user_id = str(user.id)
+  if is_local_demo_user(user):
+    memories = DEMO_MEMORIES.get(user_id, [])
+    DEMO_MEMORIES[user_id] = [
+      item for item in memories if str(item.get("id")) != str(memory_id)
+    ]
+    return {"status": "success"}
+  require_supabase()
+  supabase_client.table("memories").delete().eq("id", memory_id).eq(
+      "user_id", user_id
+  ).execute()
+  return {"status": "success"}
+
+
+async def extract_memories(user, user_text: str, assistant_text: str):
+  try:
+    if not groq_client:
+      return
+    if len((user_text or "").strip()) < 30 or len((assistant_text or "").strip()) < 30:
+      return
+    response = await groq_client.chat.completions.create(
+      model="openai/gpt-oss-20b",
+      messages=[
+        {
+          "role": "system",
+          "content": "Extract durable facts about the user (identity, preferences, projects, relationships, goals) from this chat exchange. Output one short fact per line and nothing else, or exactly NONE.",
+        },
+        {
+          "role": "user",
+          "content": f"User: {user_text[:1500]}\nAssistant: {assistant_text[:1500]}",
+        },
+      ],
+      max_tokens=150,
+    )
+    content = (response.choices[0].message.content or "")
+    lines = []
+    for line in content.splitlines():
+      line = line.strip().strip("-•*0123456789. ").strip()
+      if line and line.upper() != "NONE" and len(line) > 3:
+        lines.append(line[:300])
+    for line in lines[:5]:
+      try:
+        add_user_memory(user, line)
+      except HTTPException:
+        break
+      except Exception:
+        break
+  except Exception:
+    pass
+
+
+class MemoryRequest(BaseModel):
+  content: str
+
+
+@app.get("/memory")
+def list_memories(authorization: str | None = Header(default=None)):
+  user = get_current_user(authorization)
+  return get_user_memories(user)
+
+
+@app.post("/memory")
+def create_memory(
+    request: MemoryRequest,
+    authorization: str | None = Header(default=None),
+):
+  user = get_current_user(authorization)
+  return add_user_memory(user, request.content)
+
+
+@app.delete("/memory/{memory_id}")
+def remove_memory(
+    memory_id: str,
+    authorization: str | None = Header(default=None),
+):
+  user = get_current_user(authorization)
+  return delete_user_memory(user, memory_id)
+
+
 @app.get("/messages/{conversation_id}")
 def get_messages(
     conversation_id: str,
@@ -896,6 +1042,21 @@ async def chat_stream(
     + developer_identity_override
     + (f" User preferences to remember: {memory}." if memory else "")
   )
+  if user and not is_guest and request.settings.get("memory", True):
+    try:
+      stored = [
+        item.get("content", "")
+        for item in get_user_memories(user)
+        if item.get("content")
+      ]
+      if stored:
+        combined = " | ".join(stored)[:2000]
+        system_prompt += (
+          " Long-term memories about the user"
+          f" (recall naturally when relevant): {combined}."
+        )
+    except HTTPException:
+      pass
   if personality == "mica":
     system_prompt += (
       " You are Mica, a warm, affectionate, and nurturing caretaker. "
@@ -1055,6 +1216,10 @@ async def chat_stream(
             "content": full_reply,
             "conversation_id": request.conversation_id,
         }).execute()
+      if request.settings.get("memory", True):
+        asyncio.create_task(
+          extract_memories(user, request.message, full_reply)
+        )
 
   return StreamingResponse(generate(), media_type="text/plain")
 

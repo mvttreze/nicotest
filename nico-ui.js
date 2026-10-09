@@ -134,6 +134,23 @@
     const add = (g, label, fn) => c.push({ g, label, fn });
     add("Chat", "New chat", () => $(".new-chat-btn")?.click());
     add("Chat", "Focus message box", () => $("#userInput")?.focus());
+    add("Chat", "Morning briefing", () => {
+      const i = $("#userInput");
+      if (i) i.value = "Briefing";
+      $("#sendBtn")?.click();
+    });
+    add("Chat", "New reminder…", () => {
+      const i = $("#userInput");
+      if (i) {
+        i.value = "Remind me in ";
+        i.focus();
+      }
+    });
+    add("Chat", "What Nico remembers", () => {
+      const i = $("#userInput");
+      if (i) i.value = "What do you remember?";
+      $("#sendBtn")?.click();
+    });
     add("Chat", "Clear context", () => $("#clearContextBtn")?.click());
     add("Chat", "Export as Markdown", () => $("#exportMarkdownBtn")?.click());
     add("App", "Open settings", () => $("#settingsBtn")?.click());

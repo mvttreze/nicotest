@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
-    <link rel="stylesheet" href="style.css?v=fix4">
-    <link rel="stylesheet" href="nico-redesign.css?v=fix4">
+    <link rel="stylesheet" href="style.css?v=fix5">
+    <link rel="stylesheet" href="nico-redesign.css?v=fix5">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
@@ -119,11 +119,13 @@
         <header class="top-header">
             <button class="mobile-menu-btn" id="menu-toggle" type="button" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button>
             <div class="top-header-actions">
+                <button id="reminderBtn" class="icon-btn reminder-btn" type="button" aria-label="Reminders" aria-expanded="false" aria-controls="reminderDropdown" title="Reminders">🔔<span id="reminderBadge" class="reminder-badge" hidden>0</span></button>
                 <button id="exportBtn" class="export-btn" onclick="exportChat()" title="Export Chat History">
                     ⬇ Export Chat
                 </button>
                 <span class="model-badge">Nico v2 • System OS</span>
             </div>
+            <div class="reminder-dropdown" id="reminderDropdown" aria-hidden="true"></div>
         </header>
 
         <section class="settings-panel" id="settingsPanel" aria-hidden="true">
@@ -219,6 +221,17 @@
                     <textarea id="memoryInput" class="memory-input" rows="2" placeholder="Facts Nico should remember about you"></textarea>
                     <label class="setting-toggle"><span>Use chat context</span><input id="contextSetting" type="checkbox" checked></label>
                     <label class="setting-toggle"><span>Sound effects</span><input id="soundSetting" type="checkbox"></label>
+                    <label class="setting-toggle"><span>Wake word (“Hey Nico”)</span><input id="wakeSetting" type="checkbox"></label>
+                    <label class="setting-row">Briefing city
+                        <input id="briefCity" type="text" placeholder="e.g. Manila" autocomplete="off">
+                    </label>
+                    <div class="memory-manager">
+                        <div class="custom-theme-heading">
+                            <span>Long-term memory</span>
+                            <small id="memoryCount"></small>
+                        </div>
+                        <div id="memoryList" class="memory-list" aria-live="polite"></div>
+                    </div>
                 </section>
                 <section class="settings-tab-panel" id="settings-vision" role="tabpanel" hidden>
                     <div class="vision-settings-intro">
@@ -289,6 +302,7 @@
                     <button type="button" data-prompt="Explain this simply: ">Explain something</button>
                     <button type="button" data-prompt="Help me plan my day: ">Plan my day</button>
                     <button type="button" data-prompt="Write a message to ">Draft a message</button>
+                    <button type="button" data-prompt="Briefing">Morning briefing</button>
                 </div>
             </div>
             
@@ -350,7 +364,7 @@
     </main>
 </div>
 
-<script src="script.js?v=fix4"></script>
+<script src="script.js?v=fix5"></script>
 <script src="nico-ui.js"></script>
 <script>
     if ("serviceWorker" in navigator) {
