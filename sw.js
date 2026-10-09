@@ -1,4 +1,4 @@
-const CACHE_NAME = "nico-shell-v7";
+const CACHE_NAME = "nico-shell-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,10 @@ const APP_SHELL = [
   "./script.js",
   "./manifest.json",
   "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./icon-maskable-512.png",
+  "./icon-180.png",
 ];
 
 self.addEventListener("install", (event) => {

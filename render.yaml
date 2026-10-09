@@ -34,11 +34,11 @@ services:
       - key: ALLOW_DEMO_AUTH
         value: "false"
       - key: ALLOWED_ORIGINS
-        value: https://nico-ai.onrender.com
+        value: https://nico-ai-assistant.onrender.com
 
   # Static frontend. Do not use Python/gunicorn for this URL.
   - type: web
     name: nico-ai
     runtime: static
-    buildCommand: mkdir -p public && cp index.html style.css nico-redesign.css nico-ui.js script.js manifest.json sw.js icon.svg public/
+    buildCommand: mkdir -p public && cp index.html style.css nico-redesign.css nico-ui.js script.js manifest.json sw.js icon.svg icon-192.png icon-512.png icon-maskable-512.png icon-180.png icon-32.png public/
     staticPublishPath: ./public

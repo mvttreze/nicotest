@@ -64,7 +64,7 @@ let settings = { ...defaultSettings };
 
 function syncDeveloperModePreference() {
   const value = settings.personality === "developer" ? "1" : "0";
-  localStorage.setItem(developerModeStorageKey, value);
+  storageSet(developerModeStorageKey, value);
 }
 let visionStream = null;
 let capturedVisionDataUrl = "";
@@ -83,8 +83,50 @@ try {
 }
 
 function saveSettings() {
-  localStorage.setItem(settingsStorageKey, JSON.stringify(settings));
+  storageSet(settingsStorageKey, JSON.stringify(settings));
   syncDeveloperModePreference();
+}
+
+// Quota-guarded storage: image history can fill the ~5MB localStorage
+// budget, and an unguarded setItem throw silently kills flows like New chat.
+// On failure we evict regenerable image caches once, then retry.
+function storageSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    evictAttachmentCaches();
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (retryError) {
+      console.warn("Storage write failed:", key);
+      return false;
+    }
+  }
+}
+
+function evictAttachmentCaches() {
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("conversation_attachments:")) doomed.push(k);
+    }
+    doomed.forEach((k) => localStorage.removeItem(k));
+    // Still full? Trim every local message log to its latest 30 entries.
+    if (doomed.length === 0) {
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("nico_local_messages:")) {
+          try {
+            const messages = JSON.parse(localStorage.getItem(k) || "[]");
+            localStorage.setItem(k, JSON.stringify(messages.slice(-30)));
+          } catch {}
+        }
+      }
+    }
+  } catch {}
 }
 
 const NICO_MIDNIGHT_BLUE = "#6ea8ff";
@@ -246,6 +288,21 @@ function readCustomBackground(file) {
   });
 }
 
+async function getDesktopScreenSourceId() {
+  try {
+    if (!window.nicoDesktop?.pickScreenSource) return null;
+    const sources = await window.nicoDesktop.pickScreenSource();
+    if (!sources || !sources.length) return null;
+    const screen =
+      sources.find((s) => String(s.id || "").startsWith("screen:")) ||
+      sources.find((s) => /screen|display|monitor|entire/i.test(s.name || "")) ||
+      sources[0];
+    return screen.id;
+  } catch {
+    return null;
+  }
+}
+
 async function startVisionMode() {
   const overlay = document.getElementById("visionOverlay");
   const preview = document.getElementById("visionPreview");
@@ -259,7 +316,36 @@ async function startVisionMode() {
   analyzeButton.disabled = true;
 
   if (!navigator.mediaDevices?.getDisplayMedia) {
-    status.textContent = "Screen capture is not supported in this browser.";
+    // Desktop app (Electron): getDisplayMedia is unavailable, so capture
+    // through the shell's screen sources instead.
+    const sourceId = await getDesktopScreenSourceId();
+    if (!sourceId) {
+      status.textContent = "Screen capture is not supported in this browser.";
+      return;
+    }
+    try {
+      visionStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId },
+        },
+      });
+      preview.srcObject = visionStream;
+      status.textContent = "Screen sharing is active";
+      captureButton.disabled = false;
+      analyzeButton.disabled = false;
+      visionStream
+        .getVideoTracks()[0]
+        ?.addEventListener("ended", stopVisionMode, { once: true });
+    } catch (error) {
+      status.textContent =
+        error?.name === "NotAllowedError"
+          ? "Access was canceled. Close this view or try again."
+          : "Could not start screen capture. Try again.";
+      if (error?.name !== "NotAllowedError") {
+        console.error("Could not start screen reader:", error);
+      }
+    }
     return;
   }
 
@@ -399,7 +485,7 @@ function readLocalConversationList() {
 }
 
 function writeLocalConversationList(list) {
-  localStorage.setItem(
+  storageSet(
     localConversationListKey(),
     JSON.stringify(list.slice(0, 50)),
   );
@@ -429,7 +515,7 @@ function readLocalConversationMessages(conversationId = currentConversationId) {
 }
 
 function writeLocalConversationMessages(conversationId, messages) {
-  localStorage.setItem(
+  storageSet(
     localConversationMessagesKey(conversationId),
     JSON.stringify(messages.slice(-200)),
   );
@@ -448,9 +534,9 @@ function appendLocalConversationMessage(conversationId, role, content, attachmen
 }
 
 function persistCurrentConversationId() {
-  localStorage.setItem("active_chat_id", currentConversationId);
+  storageSet("active_chat_id", currentConversationId);
   if (currentUser) {
-    localStorage.setItem(
+    storageSet(
       `active_chat_id:${currentUser.id}`,
       currentConversationId,
     );
@@ -502,7 +588,7 @@ async function saveConversationAttachments(attachments) {
     );
 
     stored.push(normalized);
-    localStorage.setItem(
+    storageSet(
       attachmentStorageKey(),
       JSON.stringify(stored.slice(-50)),
     );
@@ -552,7 +638,7 @@ function isValidConversationId(value) {
 let currentConversationId = isValidConversationId(savedConversationId)
   ? savedConversationId
   : createConversationId();
-localStorage.setItem("active_chat_id", currentConversationId);
+storageSet("active_chat_id", currentConversationId);
 
 let recognition = null;
 let isListening = false;
@@ -688,23 +774,53 @@ if (micBtn) {
   micBtn.onclick = toggleSpeech;
 }
 
+function getAttachMenu() {
+  return document.getElementById("addFilesDropdown");
+}
+
+function getAddBtn() {
+  return document.getElementById("addBtn");
+}
+
+function setAttachMenu(open) {
+  const menu = getAttachMenu();
+  const btn = getAddBtn();
+  if (!menu || !btn) {
+    showComposerToast("Attach menu unavailable — hard-refresh the page");
+    return false;
+  }
+  menu.classList.toggle("open", open);
+  // Inline display backs up the stylesheet: even a stale cached CSS file
+  // without the .open rule can't keep the bubble hidden.
+  menu.style.display = open ? "flex" : "";
+  menu.setAttribute("aria-hidden", String(!open));
+  btn.setAttribute("aria-expanded", String(open));
+  return true;
+}
+
+function closeAttachMenu() {
+  const menu = getAttachMenu();
+  if (!menu) return;
+  menu.classList.remove("open");
+  menu.style.display = "";
+  menu.setAttribute("aria-hidden", "true");
+  getAddBtn()?.setAttribute("aria-expanded", "false");
+}
+
 document.addEventListener("click", (event) => {
-  if (!addFilesDropdown) return;
   if (
     !event.target.closest("#addBtn") &&
     !event.target.closest("#addFilesDropdown")
   ) {
-    addFilesDropdown.classList.remove("open");
-    addFilesDropdown.setAttribute("aria-hidden", "true");
-    addBtn?.setAttribute("aria-expanded", "false");
+    closeAttachMenu();
   }
 });
 
 if (addBtn) {
-  addBtn.addEventListener("click", () => {
-    const isOpen = addFilesDropdown.classList.toggle("open");
-    addFilesDropdown.setAttribute("aria-hidden", String(!isOpen));
-    addBtn.setAttribute("aria-expanded", String(isOpen));
+  addBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const menu = getAttachMenu();
+    setAttachMenu(!(menu && menu.classList.contains("open")));
   });
 }
 
@@ -771,9 +887,7 @@ function renderAttachments() {
 
 function selectFiles(kind) {
   filePickers[kind]?.click();
-  addFilesDropdown?.classList.remove("open");
-  addFilesDropdown?.setAttribute("aria-hidden", "true");
-  addBtn?.setAttribute("aria-expanded", "false");
+  closeAttachMenu();
 }
 
 function isImageFile(file) {
@@ -1010,9 +1124,7 @@ document
 document
   .getElementById("pasteImageBtn")
   ?.addEventListener("click", async () => {
-    addFilesDropdown?.classList.remove("open");
-    addFilesDropdown?.setAttribute("aria-hidden", "true");
-    addBtn?.setAttribute("aria-expanded", "false");
+    closeAttachMenu();
 
     if (!navigator.clipboard?.read) {
       alert(
@@ -1808,7 +1920,7 @@ function getPinnedConversationIds() {
 function setPinnedConversation(id, pinned) {
   const pinnedIds = getPinnedConversationIds().filter((value) => value !== id);
   if (pinned) pinnedIds.unshift(id);
-  localStorage.setItem("pinned_conversations", JSON.stringify(pinnedIds));
+  storageSet("pinned_conversations", JSON.stringify(pinnedIds));
   loadRecentConversations();
 }
 
@@ -2163,7 +2275,7 @@ function readReminders() {
 }
 
 function writeReminders(list) {
-  localStorage.setItem(REMINDER_KEY, JSON.stringify(list.slice(0, 50)));
+  storageSet(REMINDER_KEY, JSON.stringify(list.slice(0, 50)));
 }
 
 function fmtCountdown(ms) {
@@ -2444,7 +2556,7 @@ function toggleReminderPanel(force) {
   const btn = document.getElementById("reminderBtn");
   if (!panel) return;
   const open = force !== undefined ? force : !panel.classList.contains("open");
-  addFilesDropdown?.classList.remove("open");
+  closeAttachMenu();
   renderReminderPanel();
   panel.classList.toggle("open", open);
   panel.setAttribute("aria-hidden", String(!open));
@@ -3246,7 +3358,10 @@ function initializeSettingsPanel() {
   };
 
   Object.entries(controls).forEach(([key, control]) => {
-    control.value = settings[key];
+    // Skip controls missing from this HTML version so a stale cached page
+    // can never kill settings init (and everything after it).
+    if (!control) return;
+    control.value = settings[key] ?? control.value;
     if (control.type === "checkbox") control.checked = settings[key];
     control.addEventListener("input", () => {
       settings[key] =
@@ -3356,11 +3471,11 @@ function finishDemoSignIn(username, token = null) {
   };
 
   if (token) {
-    localStorage.setItem("nico_demo_auth_token", token);
-    localStorage.setItem("nico_demo_user", JSON.stringify(demoUser));
+    storageSet("nico_demo_auth_token", token);
+    storageSet("nico_demo_user", JSON.stringify(demoUser));
   } else {
-    localStorage.setItem("nico_demo_auth_token", "demo-local");
-    localStorage.setItem("nico_demo_user", JSON.stringify(demoUser));
+    storageSet("nico_demo_auth_token", "demo-local");
+    storageSet("nico_demo_user", JSON.stringify(demoUser));
   }
 
   updateAuthUi(demoUser);
@@ -3423,7 +3538,7 @@ function updateAuthUi(user) {
   }
 
   if (user.id && user.id.startsWith("demo-")) {
-    localStorage.setItem("nico_demo_user", JSON.stringify(user));
+    storageSet("nico_demo_user", JSON.stringify(user));
   }
 
   setAuthScreenVisible(false);
@@ -3497,8 +3612,8 @@ async function submitDemoAuth(action = "login", username, password) {
     updateAuthUi(data.session?.user || demoUser);
   } else {
     if (token) {
-      localStorage.setItem("nico_demo_auth_token", token);
-      localStorage.setItem("nico_demo_user", JSON.stringify(demoUser));
+      storageSet("nico_demo_auth_token", token);
+      storageSet("nico_demo_user", JSON.stringify(demoUser));
     }
     updateAuthUi(demoUser);
   }
