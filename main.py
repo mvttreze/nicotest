@@ -752,6 +752,7 @@ class ChatRequest(BaseModel):
   conversation_id: str
   attachments: list[dict] = Field(default_factory=list)
   settings: dict = Field(default_factory=dict)
+  client_message_id: str | None = None
 
   @model_validator(mode="after")
   def validate_attachments(self):
@@ -1171,8 +1172,15 @@ def insert_message(payload: dict):
       raise
 
 
+def valid_client_message_id(value):
+  try:
+    return str(uuid.UUID(str(value or "")))
+  except (ValueError, AttributeError, TypeError):
+    return str(uuid.uuid4())
+
+
 def fetch_messages(conversation_id: str):
-  for columns in ("role, content, attachments", "role, content"):
+  for columns in ("id, role, content, attachments", "role, content, attachments", "role, content"):
     try:
       response = (
           supabase_client.table("messages")
@@ -1184,11 +1192,58 @@ def fetch_messages(conversation_id: str):
     except Exception:
       continue
     rows = response.data or []
-    if columns == "role, content":
-      for row in rows:
-        row["attachments"] = []
+    for row in rows:
+      row.setdefault("id", None)
+      row.setdefault("attachments", [])
     return rows
   raise HTTPException(status_code=503, detail="Could not load messages")
+
+
+class EditMessageRequest(BaseModel):
+  content: str
+
+
+@app.post("/messages/{message_id}/edit")
+def edit_message(
+    message_id: str,
+    request: EditMessageRequest,
+    authorization: str | None = Header(default=None),
+):
+  user = get_current_user(authorization)
+  content = (request.content or "").strip()[:8000]
+  if not content:
+    raise HTTPException(status_code=400, detail="Content is required")
+  if is_local_demo_user(user):
+    user_id = str(user.id)
+    for conversation_id, messages in DEMO_MESSAGES.get(user_id, {}).items():
+      for index, item in enumerate(messages):
+        if str(item.get("id")) == str(message_id):
+          item["content"] = content
+          deleted = len(messages) - index - 1
+          del messages[index + 1:]
+          return {"status": "success", "deleted": deleted}
+    raise HTTPException(status_code=404, detail="Message not found")
+  require_supabase()
+  try:
+    found = (
+        supabase_client.table("messages")
+        .select("id, conversation_id, created_at")
+        .eq("id", message_id)
+        .limit(1)
+        .execute()
+    ).data or []
+  except Exception as error:
+    raise HTTPException(status_code=503, detail=str(error)) from error
+  if not found:
+    raise HTTPException(status_code=404, detail="Message not found")
+  get_owned_conversation(found[0]["conversation_id"], user.id)
+  supabase_client.table("messages").delete().eq(
+      "conversation_id", found[0]["conversation_id"]
+  ).gt("created_at", found[0]["created_at"]).execute()
+  supabase_client.table("messages").update(
+      {"content": content}
+  ).eq("id", message_id).execute()
+  return {"status": "success"}
 
 
 def get_user_memories(user):
@@ -1387,6 +1442,7 @@ async def chat_stream(
       history = user_messages.get(request.conversation_id, [])
       past_messages = history if request.settings.get("context", True) else []
       user_messages.setdefault(request.conversation_id, []).append({
+          "id": valid_client_message_id(request.client_message_id),
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,
@@ -1418,6 +1474,7 @@ async def chat_stream(
       )
 
       user_payload = {
+          "id": valid_client_message_id(request.client_message_id),
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,

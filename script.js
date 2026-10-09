@@ -521,9 +521,10 @@ function writeLocalConversationMessages(conversationId, messages) {
   );
 }
 
-function appendLocalConversationMessage(conversationId, role, content, attachments = []) {
+function appendLocalConversationMessage(conversationId, role, content, attachments = [], msgId = null) {
   const messages = readLocalConversationMessages(conversationId);
   messages.push({
+    id: msgId || newMessageId(),
     role,
     content,
     attachments,
@@ -1653,9 +1654,7 @@ async function retryLastMessage() {
       }
     }
     const retryText = lastUser.dataset?.raw || lastUser.querySelector(".content")?.innerText || lastUserText;
-    const retryImgs = Array.from(lastUser.querySelectorAll("img.message-image-preview"))
-      .map((img) => ({ name: img.alt || "attached-image.jpg", mime_type: "image/jpeg", data_url: img.src }))
-      .filter((a) => a.data_url && a.data_url.startsWith("data:"));
+    const retryImgs = collectImgsFromMessage(lastUser);
     showComposerToast("Regenerating…");
     await streamAssistantResponse(retryText, retryImgs);
     return;
@@ -1663,6 +1662,121 @@ async function retryLastMessage() {
   userInput.value = lastUserText;
   autoGrowComposer();
   await sendMessage();
+}
+
+function collectImgsFromMessage(msgDiv) {
+  if (!msgDiv) return [];
+  return Array.from(msgDiv.querySelectorAll("img.message-image-preview"))
+    .map((img) => ({
+      name: img.alt || "attached-image.jpg",
+      mime_type: "image/jpeg",
+      data_url: img.src,
+    }))
+    .filter((a) => a.data_url && a.data_url.startsWith("data:"));
+}
+
+function newMessageId() {
+  try {
+    if (crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return `msg-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+}
+
+function updateLocalLogAfterEdit(conversationId, msgId, oldText, newText) {
+  const msgs = readLocalConversationMessages(conversationId);
+  let idx = msgId ? msgs.findIndex((m) => m.id === msgId) : -1;
+  if (idx < 0) {
+    for (let i = msgs.length - 1; i >= 0; i -= 1) {
+      if (msgs[i].role === "user" && msgs[i].content === oldText) {
+        idx = i;
+        break;
+      }
+    }
+  }
+  if (idx < 0) return;
+  msgs[idx].content = newText;
+  writeLocalConversationMessages(conversationId, msgs.slice(0, idx + 1));
+}
+
+async function persistEdit(msgDiv, oldText, newText) {
+  const id = msgDiv.dataset.msgId;
+  if (!authClient && currentUser) {
+    updateLocalLogAfterEdit(currentConversationId, id, oldText, newText);
+    return;
+  }
+  if (id && currentUser) {
+    try {
+      await apiFetch(`${apiBaseUrl}/messages/${id}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newText }),
+      });
+    } catch {
+      showComposerToast("Edit applied here — history sync failed");
+    }
+  }
+}
+
+function startInlineEdit(msgDiv) {
+  if (!msgDiv || msgDiv.querySelector(":scope > .inline-editor")) return;
+  const content = msgDiv.querySelector(".content");
+  if (!content) return;
+  const originalText = msgDiv.dataset.raw || content.innerText || "";
+
+  msgDiv.classList.add("editing");
+  const editor = document.createElement("div");
+  editor.className = "inline-editor";
+  const area = document.createElement("textarea");
+  area.rows = 3;
+  area.value = originalText;
+  area.setAttribute("aria-label", "Edit message");
+  const row = document.createElement("div");
+  row.className = "inline-editor-actions";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "inline-editor-save";
+  save.textContent = "Save & resend";
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "inline-editor-cancel";
+  cancel.textContent = "Cancel";
+  row.append(cancel, save);
+  editor.append(area, row);
+  content.after(editor);
+  area.focus();
+  area.setSelectionRange(area.value.length, area.value.length);
+
+  const close = () => {
+    editor.remove();
+    msgDiv.classList.remove("editing");
+  };
+  cancel.addEventListener("click", close);
+  area.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") close();
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      save.click();
+    }
+  });
+  save.addEventListener("click", async () => {
+    const newText = area.value.trim();
+    if (!newText || newText === originalText) {
+      close();
+      return;
+    }
+    // Drop every bubble after the edited one (Claude-style branch).
+    const all = Array.from(chatBox.querySelectorAll(".message"));
+    const at = all.indexOf(msgDiv);
+    all.slice(at + 1).forEach((m) => {
+      if (m.id !== "typingIndicator") m.remove();
+    });
+    if (content.firstChild) content.firstChild.textContent = newText;
+    msgDiv.dataset.raw = newText.slice(0, 8000);
+    close();
+    await persistEdit(msgDiv, originalText, newText);
+    showComposerToast("Regenerating…");
+    await streamAssistantResponse(newText, collectImgsFromMessage(msgDiv));
+  });
 }
 
 function attachMessageFooter(msgDiv, role, rawText) {
@@ -1727,10 +1841,9 @@ function attachMessageFooter(msgDiv, role, rawText) {
     bar.appendChild(mkBtn("Retry", "Retry", ICONS.retry, () => retryLastMessage()));
   } else {
     bar.appendChild(
-      mkBtn("Edit and resend", "Edit and resend", ICONS.edit, () => {
-        userInput.value = getText();
-        autoGrowComposer();
-        userInput.focus();
+      mkBtn("Edit message", "Edit message", ICONS.edit, (btn) => {
+        const bubble = btn.closest(".message");
+        if (bubble) startInlineEdit(bubble);
       }),
     );
   }
@@ -1744,13 +1857,14 @@ function attachMessageFooter(msgDiv, role, rawText) {
   msgDiv.appendChild(bar);
 }
 
-function appendMessage(role, text, attachments = []) {
+function appendMessage(role, text, attachments = [], msgId = null) {
   // Update state for non-empty chats
   appLayout?.classList.remove("new-chat-mode");
   appLayout?.classList.add("active-chat-mode");
 
   const msgDiv = document.createElement("div");
   msgDiv.className = `message ${role}`;
+  if (msgId) msgDiv.dataset.msgId = msgId;
   let footerText = text;
 
   if (role === "assistant") {
@@ -2180,7 +2294,7 @@ async function loadMessages() {
       clearChatBox();
       if (Array.isArray(data)) {
         data.forEach((msg) => {
-          appendMessage(msg.role, msg.content, msg.attachments || []);
+          appendMessage(msg.role, msg.content, msg.attachments || [], msg.id);
         });
       }
       return;
@@ -2212,7 +2326,7 @@ async function loadMessages() {
         } else if (msg.role === "user") {
           attachments = storedAttachments[userMessageIndex++] || [];
         }
-        appendMessage(msg.role, msg.content, attachments);
+        appendMessage(msg.role, msg.content, attachments, msg.id);
       });
     }
   } catch (err) {
@@ -2964,7 +3078,8 @@ async function sendMessage() {
   }
 
   stopSpeech();
-  appendMessage("user", displayMessage, attachmentRequest.attachments);
+  const userMsgId = newMessageId();
+  appendMessage("user", displayMessage, attachmentRequest.attachments, userMsgId);
   if (currentUser) {
     await saveConversationAttachments(attachmentRequest.attachments);
     if (!authClient) {
@@ -2978,6 +3093,7 @@ async function sendMessage() {
         "user",
         displayMessage,
         attachmentRequest.attachments,
+        userMsgId,
       );
     }
   }
@@ -3036,6 +3152,7 @@ async function sendMessage() {
         conversation_id: currentConversationId,
         attachments: attachmentRequest.attachments,
         settings,
+        client_message_id: userMsgId,
       }),
     });
 
