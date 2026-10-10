@@ -3117,7 +3117,7 @@ async function maybeHandleLocalCommand(raw) {
   let m;
   if (
     (m = cmd.match(
-      /^(?:please\s+)?(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
+      /^(?:please\s+|can you\s+)?(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
     )) ||
     (m = cmd.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)(?: doc| document| file)?$/i))
   ) {
@@ -3194,10 +3194,10 @@ async function maybeHandleLocalCommand(raw) {
   }
   if (
     (m = cmd.match(
-      /^(?:please\s+)?(?:(?:draw|paint|sketch)(?: me)?|(?:generate|create|make|give)(?: me)? an image of|(?:generate|create|make|give)(?: me)? a picture of|picture of|imagine)\s*(.*)$/i,
+      /^(?:please\s+|can you\s+)?(?:(?:draw|paint|sketch)(?: me)?|(?:generate|create|make|give)(?: me)? an image of|(?:generate|create|make|give)(?: me)? a picture of|picture of|imagine)\s*(.*)$/i,
     ))
   ) {
-    await handleImagine((m[1] || "").trim(), text);
+    await handleImagine((m[1] || "").trim().replace(/\s*[?.!]+$/, ""), text);
     return true;
   }
   return false;
