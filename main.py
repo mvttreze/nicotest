@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from groq import AsyncGroq
@@ -78,11 +78,6 @@ OPENCODE_MODELS = [
   for model in os.getenv("OPENCODE_MODELS", "nemotron-3-ultra-free,exo-free").split(",")
   if model.strip()
 ]
-try:
-  ZEN_DAILY_CAP_PER_USER = int((os.getenv("ZEN_DAILY_CAP_PER_USER", "20") or "20").strip())
-except ValueError:
-  ZEN_DAILY_CAP_PER_USER = 20
-ZEN_USAGE: dict[str, dict] = {}
 
 
 def runtime_service_status():
@@ -952,32 +947,6 @@ def build_user_content(message, attachments):
   return [{"type": "text", "text": full_text or "Describe this image."}, *image_parts]
 
 
-def zen_quota_key(user, client_host: str | None):
-  if user is not None:
-    return f"user:{user.id}"
-  return f"ip:{client_host or 'unknown'}"
-
-
-def zen_quota_ok(key: str):
-  if ZEN_DAILY_CAP_PER_USER <= 0:
-    return True
-  today = datetime.utcnow().date().isoformat()
-  entry = ZEN_USAGE.get(key)
-  if not entry or entry.get("date") != today:
-    ZEN_USAGE[key] = {"date": today, "count": 0}
-    return True
-  return entry["count"] < ZEN_DAILY_CAP_PER_USER
-
-
-def zen_quota_hit(key: str):
-  today = datetime.utcnow().date().isoformat()
-  entry = ZEN_USAGE.get(key)
-  if not entry or entry.get("date") != today:
-    ZEN_USAGE[key] = {"date": today, "count": 1}
-  else:
-    entry["count"] += 1
-
-
 def parse_zen_sse_line(line: str):
   if not line.startswith("data:"):
     return None
@@ -1045,7 +1014,7 @@ async def zen_chat_once(model: str, messages: list, max_tokens: int = 60):
     return (((obj.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
 
 
-async def generate_title(text: str, allow_zen: bool = False, prefer_zen: bool = False):
+async def generate_title(text: str, use_zen: bool = False):
   prompt = (
     "Summarize this query into a 3 to 5 word title. Do not use quotes or"
     f" punctuation: '{text}'"
@@ -1066,12 +1035,10 @@ async def generate_title(text: str, allow_zen: bool = False, prefer_zen: bool = 
     return (title_res.choices[0].message.content or "").strip() or "Untitled Chat"
 
   attempts = []
-  if allow_zen and prefer_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
+  if use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
     attempts.append(via_zen)
-  if groq_client:
+  elif groq_client:
     attempts.append(via_groq)
-  if allow_zen and not prefer_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
-    attempts.append(via_zen)
   for attempt in attempts:
     try:
       return await attempt()
@@ -1573,7 +1540,6 @@ def get_messages(
 async def chat_stream(
     request: ChatRequest,
     authorization: str | None = Header(default=None),
-    fastapi_request: Request = None,
 ):
   if not groq_client and not (OPENCODE_API_KEY and OPENCODE_MODELS):
     raise HTTPException(status_code=503, detail="No chat provider is configured")
@@ -1598,9 +1564,7 @@ async def chat_stream(
       user_conversations = DEMO_CONVERSATIONS.setdefault(user_id, {})
       user_messages = DEMO_MESSAGES.setdefault(user_id, {})
       if request.conversation_id not in user_conversations:
-        generated_title = await generate_title(
-          request.message, can_use_zen, prefer_zen=can_use_zen
-        )
+        generated_title = await generate_title(request.message, can_use_zen)
         user_conversations[request.conversation_id] = {
             "id": request.conversation_id,
             "title": generated_title,
@@ -1626,9 +1590,7 @@ async def chat_stream(
       )
 
       if not conv_check.data:
-        generated_title = await generate_title(
-          request.message, can_use_zen, prefer_zen=can_use_zen
-        )
+        generated_title = await generate_title(request.message, can_use_zen)
 
         supabase_client.table("conversations").insert({
             "id": request.conversation_id,
@@ -1799,7 +1761,6 @@ async def chat_stream(
         attachment.get("mime_type", "").startswith("image/")
         for attachment in request.attachments
       )
-      zen_skipped_quota = False
       if image_request:
         try:
           full_reply = await generate_gemini_image_response(
@@ -1811,37 +1772,18 @@ async def chat_stream(
         yield full_reply
         models_to_try = []
       else:
-        models_to_try = []
-        groq_entry = (
-          [(
+        if can_use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
+          models_to_try = [("zen", name) for name in OPENCODE_MODELS]
+        elif groq_client:
+          models_to_try = [(
             "groq",
             "openai/gpt-oss-20b"
             if request.settings.get("model") == "light"
             else "openai/gpt-oss-120b",
           )]
-          if groq_client
-          else []
-        )
-        client_ip = (
-          fastapi_request.client.host
-          if fastapi_request and fastapi_request.client
-          else None
-        )
-        zen_key = zen_quota_key(user, client_ip)
-        zen_available = (
-          bool(OPENCODE_API_KEY and OPENCODE_MODELS) and can_use_zen
-        )
-        zen_skipped_quota = zen_available and not zen_quota_ok(zen_key)
-        zen_entries = (
-          [("zen", name) for name in OPENCODE_MODELS]
-          if zen_available and not zen_skipped_quota
-          else []
-        )
-        # Badged accounts lead with Zen (bigger context); Groq is their
-        # fallback. Everyone else is Groq-only.
-        models_to_try = zen_entries + groq_entry if can_use_zen else groq_entry
+        else:
+          models_to_try = []
       last_error = None
-      zen_billed = False
 
       for provider, model in models_to_try:
         try:
@@ -1864,9 +1806,6 @@ async def chat_stream(
                 content = format_response(content)
                 full_reply += content
                 yield content
-                if not zen_billed:
-                  zen_billed = True
-                  zen_quota_hit(zen_key)
           break
         except asyncio.CancelledError:
           raise
@@ -1886,15 +1825,10 @@ async def chat_stream(
           )
         else:
           full_reply = f"Nico could not analyze that request right now. Backend error: {last_error}"
-          if zen_skipped_quota:
-            full_reply += " (Zen fallback skipped: daily cap reached)"
         full_reply = format_response(full_reply)
         yield full_reply
       elif not full_reply and not models_to_try:
-        full_reply = (
-          "Nico's free fallback models hit the daily cap. Try again tomorrow,"
-          " or ask Matt to raise ZEN_DAILY_CAP_PER_USER."
-        )
+        full_reply = "Nico has no chat provider available right now. Try again in a bit."
         full_reply = format_response(full_reply)
         yield full_reply
 
