@@ -1857,6 +1857,29 @@ function attachMessageFooter(msgDiv, role, rawText) {
   msgDiv.appendChild(bar);
 }
 
+function appendAttachmentImages(content, attachments = []) {
+  const rendered = (attachments || []).filter((attachment) =>
+    (attachment.mime_type || "").startsWith("image/"),
+  );
+  rendered.forEach((attachment) => {
+    const image = document.createElement("img");
+    image.className = "message-image-preview";
+    image.src = attachment.data_url;
+    image.alt = attachment.name || "Attached image";
+    image.loading = "lazy";
+    // Never show a raw-filename box: unreadable bytes (e.g. HEIC photos
+    // browsers can't decode) become a labeled placeholder instead.
+    image.onerror = () => {
+      const note = document.createElement("div");
+      note.className = "message-image-unavailable";
+      note.textContent = `🖼 ${attachment.name || "Attached image"} (preview unavailable — Nico still received the file)`;
+      image.replaceWith(note);
+    };
+    content.appendChild(image);
+  });
+  return rendered;
+}
+
 function appendMessage(role, text, attachments = [], msgId = null) {
   // Update state for non-empty chats
   appLayout?.classList.remove("new-chat-mode");
@@ -1871,29 +1894,12 @@ function appendMessage(role, text, attachments = [], msgId = null) {
     msgDiv.innerHTML = `<span class="avatar-tag"></span><div class="content">${renderMarkdown(text)}</div>`;
     msgDiv.querySelector(".avatar-tag").textContent = settings.avatar;
     attachCodeCopyButtons(msgDiv);
+    appendAttachmentImages(msgDiv.querySelector(".content"), attachments);
   } else {
     const content = document.createElement("div");
     content.className = "content";
     content.textContent = text;
-    const renderedImages = attachments.filter((attachment) =>
-      (attachment.mime_type || "").startsWith("image/"),
-    );
-    renderedImages.forEach((attachment) => {
-      const image = document.createElement("img");
-      image.className = "message-image-preview";
-      image.src = attachment.data_url;
-      image.alt = attachment.name || "Attached image";
-      image.loading = "lazy";
-      // Never show a raw-filename box: unreadable bytes (e.g. HEIC photos
-      // browsers can't decode) become a labeled placeholder instead.
-      image.onerror = () => {
-        const note = document.createElement("div");
-        note.className = "message-image-unavailable";
-        note.textContent = `🖼 ${attachment.name || "Attached image"} (preview unavailable — Nico still received the file)`;
-        image.replaceWith(note);
-      };
-      content.appendChild(image);
-    });
+    const renderedImages = appendAttachmentImages(content, attachments);
     // Heal old messages saved as "[Attached binary file: photo.jpg]" when the
     // image itself is available: drop the stale marker line for each rendered
     // image so history shows the picture instead of the placeholder text.
@@ -3266,20 +3272,22 @@ async function handleImagine(prompt) {
   }
   showThinking();
   try {
-    const res = await fetch(`${apiBaseUrl}/imagine`, {
+    const res = await apiFetch(`${apiBaseUrl}/imagine`, {
+      allowGuest: true,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, conversation_id: currentConversationId }),
     });
     if (!res.ok) throw new Error("render failed");
     const data = await res.json();
-    appendMessage("assistant", `**${data.prompt || prompt}**`, [
+    const imagineAttachments = [
       {
         name: "nico-image.jpg",
         mime_type: "image/jpeg",
         data_url: data.image_url,
       },
-    ]);
+    ];
+    appendMessage("assistant", `**${data.prompt || prompt}**`, imagineAttachments);
     const bubbles = chatBox.querySelectorAll(".message.assistant:not(.thinking-indicator)");
     const lastBubble = bubbles[bubbles.length - 1];
     const bar = lastBubble?.querySelector(":scope > .msg-actions");
@@ -3293,14 +3301,19 @@ async function handleImagine(prompt) {
       dl.addEventListener("click", () => downloadUrl(data.image_url, "nico-image.jpg"));
       bar.insertBefore(dl, bar.querySelector(".msg-timestamp"));
     }
-    if (currentUser) {
-      await saveConversationAttachments([
-        {
-          name: "nico-image.jpg",
-          mime_type: "image/jpeg",
-          data_url: data.image_url,
-        },
-      ]);
+    if (currentUser && !authClient) {
+      upsertLocalConversation({
+        id: currentConversationId,
+        title: "Untitled Chat",
+        user_id: currentUser.id,
+      });
+      appendLocalConversationMessage(currentConversationId, "user", prompt);
+      appendLocalConversationMessage(
+        currentConversationId,
+        "assistant",
+        `**${data.prompt || prompt}**`,
+        imagineAttachments,
+      );
     }
   } catch {
     appendMessage("assistant", "I couldn't render that image — try again in a bit.", []);

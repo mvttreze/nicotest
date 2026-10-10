@@ -1583,6 +1583,7 @@ class ImagineRequest(BaseModel):
   width: int = 1024
   height: int = 1024
   model: str = "flux"
+  conversation_id: str | None = None
 
 
 class GenerateDocRequest(BaseModel):
@@ -1615,8 +1616,49 @@ def export_pdf(request: ExportDocRequest):
 
 
 @app.post("/imagine")
-def imagine(request: ImagineRequest):
-  return imagine_url(request.prompt, request.width, request.height, request.model)
+def imagine(
+    request: ImagineRequest,
+    authorization: str | None = Header(default=None),
+):
+  result = imagine_url(request.prompt, request.width, request.height, request.model)
+  try:
+    user = get_current_user(authorization) if authorization else None
+  except HTTPException:
+    user = None
+  if user and request.conversation_id:
+    caption = f"**{result['prompt']}**"
+    attachments = [{
+      "name": "nico-image.jpg",
+      "mime_type": "image/jpeg",
+      "data_url": result["image_url"],
+    }]
+    if is_local_demo_user(user):
+      user_id = str(user.id)
+      if request.conversation_id in DEMO_CONVERSATIONS.get(user_id, {}):
+        DEMO_MESSAGES.setdefault(user_id, {}).setdefault(
+          request.conversation_id, []
+        ).extend([
+          {"id": str(uuid.uuid4()), "role": "user", "content": request.prompt,
+           "conversation_id": request.conversation_id,
+           "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"},
+          {"id": str(uuid.uuid4()), "role": "assistant", "content": caption,
+           "conversation_id": request.conversation_id, "attachments": attachments,
+           "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"},
+        ])
+    elif supabase_client:
+      try:
+        get_owned_conversation(request.conversation_id, user.id)
+        supabase_client.table("messages").insert([
+          {"role": "user", "content": request.prompt,
+           "conversation_id": request.conversation_id},
+          {"role": "assistant", "content": caption,
+           "conversation_id": request.conversation_id, "attachments": attachments},
+        ]).execute()
+      except HTTPException:
+        pass
+      except Exception:
+        pass
+  return result
 
 
 @app.post("/export/generate")
