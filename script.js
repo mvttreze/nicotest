@@ -2294,7 +2294,7 @@ async function loadMessages() {
       clearChatBox();
       if (Array.isArray(data)) {
         data.forEach((msg) => {
-          appendMessage(msg.role, msg.content, msg.attachments || [], msg.id);
+          appendMessage(msg.role, msg.content, msg.attachments || [], msg.client_id ?? msg.id);
         });
       }
       return;
@@ -2326,7 +2326,7 @@ async function loadMessages() {
         } else if (msg.role === "user") {
           attachments = storedAttachments[userMessageIndex++] || [];
         }
-        appendMessage(msg.role, msg.content, attachments, msg.id);
+        appendMessage(msg.role, msg.content, attachments, msg.client_id ?? msg.id);
       });
     }
   } catch (err) {

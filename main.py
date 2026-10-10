@@ -1143,25 +1143,26 @@ def insert_message(payload: dict):
   try:
     supabase_client.table("messages").insert(payload).execute()
   except Exception as error:
-    # Pre-migration databases have no attachments column yet.
-    if "attachments" in payload and "attachments" in str(error).lower():
+    # Pre-migration databases may lack the attachments / client_id columns.
+    message = str(error).lower()
+    if any(key in payload and key in message for key in ("attachments", "client_id")):
       fallback = {
-        key: value for key, value in payload.items() if key != "attachments"
+        key: value
+        for key, value in payload.items()
+        if key not in ("attachments", "client_id")
       }
       supabase_client.table("messages").insert(fallback).execute()
     else:
       raise
 
 
-def valid_client_message_id(value):
-  try:
-    return str(uuid.UUID(str(value or "")))
-  except (ValueError, AttributeError, TypeError):
-    return str(uuid.uuid4())
-
-
 def fetch_messages(conversation_id: str):
-  for columns in ("id, role, content, attachments", "role, content, attachments", "role, content"):
+  for columns in (
+    "id, role, content, attachments, client_id",
+    "id, role, content, attachments",
+    "role, content, attachments",
+    "role, content",
+  ):
     try:
       response = (
           supabase_client.table("messages")
@@ -1176,6 +1177,7 @@ def fetch_messages(conversation_id: str):
     for row in rows:
       row.setdefault("id", None)
       row.setdefault("attachments", [])
+      row.setdefault("client_id", None)
     return rows
   raise HTTPException(status_code=503, detail="Could not load messages")
 
@@ -1198,23 +1200,37 @@ def edit_message(
     user_id = str(user.id)
     for conversation_id, messages in DEMO_MESSAGES.get(user_id, {}).items():
       for index, item in enumerate(messages):
-        if str(item.get("id")) == str(message_id):
+        if str(item.get("id")) == str(message_id) or (
+          item.get("client_id") and str(item.get("client_id")) == str(message_id)
+        ):
           item["content"] = content
           deleted = len(messages) - index - 1
           del messages[index + 1:]
           return {"status": "success", "deleted": deleted}
     raise HTTPException(status_code=404, detail="Message not found")
   require_supabase()
+  found = []
   try:
     found = (
         supabase_client.table("messages")
         .select("id, conversation_id, created_at")
-        .eq("id", message_id)
+        .eq("client_id", message_id)
         .limit(1)
         .execute()
     ).data or []
-  except Exception as error:
-    raise HTTPException(status_code=503, detail=str(error)) from error
+  except Exception:
+    found = []
+  if not found and str(message_id).isdigit():
+    try:
+      found = (
+          supabase_client.table("messages")
+          .select("id, conversation_id, created_at")
+          .eq("id", int(message_id))
+          .limit(1)
+          .execute()
+      ).data or []
+    except Exception as error:
+      raise HTTPException(status_code=503, detail=str(error)) from error
   if not found:
     raise HTTPException(status_code=404, detail="Message not found")
   get_owned_conversation(found[0]["conversation_id"], user.id)
@@ -1223,7 +1239,7 @@ def edit_message(
   ).gt("created_at", found[0]["created_at"]).execute()
   supabase_client.table("messages").update(
       {"content": content}
-  ).eq("id", message_id).execute()
+  ).eq("id", found[0]["id"]).execute()
   return {"status": "success"}
 
 
@@ -1574,7 +1590,8 @@ async def chat_stream(
       history = user_messages.get(request.conversation_id, [])
       past_messages = history if request.settings.get("context", True) else []
       user_messages.setdefault(request.conversation_id, []).append({
-          "id": valid_client_message_id(request.client_message_id),
+          "id": request.client_message_id or str(uuid.uuid4()),
+          "client_id": request.client_message_id,
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,
@@ -1606,7 +1623,7 @@ async def chat_stream(
       )
 
       user_payload = {
-          "id": valid_client_message_id(request.client_message_id),
+          "client_id": request.client_message_id,
           "role": "user",
           "content": request.message,
           "conversation_id": request.conversation_id,

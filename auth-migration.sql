@@ -74,6 +74,14 @@ create policy "Users can delete messages in their conversations"
 alter table public.messages
   add column if not exists attachments jsonb not null default '[]'::jsonb;
 
+-- Links app-side message ids (inline editing) to server rows without
+-- touching the bigint primary key.
+alter table public.messages
+  add column if not exists client_id text;
+
+create index if not exists messages_client_id_idx
+  on public.messages(client_id);
+
 -- Jarvis pack: long-term memory per user.
 create table if not exists public.memories (
   id uuid primary key default gen_random_uuid(),
