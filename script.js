@@ -3077,7 +3077,7 @@ async function maybeHandleLocalCommand(raw) {
   }
   if (
     (m = cmd.match(
-      /^(?:please\s+)?(?:draw|paint|sketch|generate an image of|create an image of|make an image of|picture of|imagine)\s*(.*)$/i,
+      /^(?:please\s+)?(?:(?:draw|paint|sketch)(?: me)?|(?:generate|create|make|give)(?: me)? an image of|(?:generate|create|make|give)(?: me)? a picture of|picture of|imagine)\s*(.*)$/i,
     ))
   ) {
     await handleImagine((m[1] || "").trim());
@@ -3188,6 +3188,7 @@ function docTitleFromTopic(topic) {
 }
 
 async function handleGenerateDoc(kind, topic) {
+  topic = String(topic || "").replace(/\([^)]*title[^)]*\)/gi, "").replace(/\s{2,}/g, " ").trim();
   appendMessage("user", `Make a ${kind} about ${topic}`, []);
   if (!topic) {
     appendMessage("assistant", "Give me a topic first — e.g. `make a pdf about sourdough`.", []);
@@ -3204,12 +3205,56 @@ async function handleGenerateDoc(kind, topic) {
     if (!res.ok) throw new Error("build failed");
     const ext = kind === "docx" ? "docx" : "pdf";
     const safe = title.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "nico";
-    downloadBlob(await res.blob(), `${safe}.${ext}`);
-    appendMessage("assistant", `Here's your ${ext.toUpperCase()} on **${topic}** — downloading now.`, []);
+    appendFileCard(`Here's your ${ext.toUpperCase()} on **${topic}**:`, await res.blob(), `${safe}.${ext}`);
   } catch {
     appendMessage("assistant", "I couldn't build that file — try again.", []);
   } finally {
     hideThinking();
+  }
+}
+
+function appendFileCard(captionMarkdown, blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const host = document.createElement("div");
+  host.className = "message assistant";
+  const content = document.createElement("div");
+  content.className = "content";
+  content.innerHTML = renderMarkdown(captionMarkdown);
+  const card = document.createElement("div");
+  card.className = "file-card";
+  const icon = document.createElement("span");
+  icon.className = "file-card-icon";
+  icon.textContent = filename.endsWith(".pdf") ? "📕" : "📄";
+  const meta = document.createElement("span");
+  meta.className = "file-card-meta";
+  const name = document.createElement("strong");
+  name.textContent = filename;
+  const size = document.createElement("small");
+  size.textContent = `${(blob.size / 1024).toFixed(0)} KB · saved in this chat, tap to download`;
+  meta.append(name, size);
+  const link = document.createElement("a");
+  link.className = "file-card-download";
+  link.href = url;
+  link.download = filename;
+  link.textContent = "Download";
+  card.append(icon, meta, link);
+  content.appendChild(card);
+  host.appendChild(content);
+  attachCodeCopyButtons(host);
+  attachMessageFooter(host, "assistant", `${captionMarkdown}\n[${filename}]`);
+  const indicator = document.getElementById("typingIndicator");
+  if (indicator) chatBox.insertBefore(host, indicator);
+  else chatBox.appendChild(host);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+async function downloadUrl(url, filename) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("fetch failed");
+    downloadBlob(await res.blob(), filename);
+  } catch {
+    window.open(url, "_blank", "noopener");
   }
 }
 
@@ -3235,6 +3280,19 @@ async function handleImagine(prompt) {
         data_url: data.image_url,
       },
     ]);
+    const bubbles = chatBox.querySelectorAll(".message.assistant:not(.thinking-indicator)");
+    const lastBubble = bubbles[bubbles.length - 1];
+    const bar = lastBubble?.querySelector(":scope > .msg-actions");
+    if (bar) {
+      const dl = document.createElement("button");
+      dl.type = "button";
+      dl.className = "msg-action-btn";
+      dl.title = "Download image";
+      dl.setAttribute("aria-label", "Download image");
+      dl.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+      dl.addEventListener("click", () => downloadUrl(data.image_url, "nico-image.jpg"));
+      bar.insertBefore(dl, bar.querySelector(".msg-timestamp"));
+    }
     if (currentUser) {
       await saveConversationAttachments([
         {

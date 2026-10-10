@@ -1299,7 +1299,7 @@ def md_to_blocks(markdown_text):
       list_buf[1].append(bullet.group(1).strip())
       i += 1
       continue
-    numbered = re.match(r"^(\d+)[.)]\s+(.*)$", stripped)
+    numbered = re.match(r"^(\d{1,3})[.)]?\s+(.*)$", stripped)
     if numbered:
       if not list_buf or list_buf[0] != "ol":
         flush_list()
@@ -1424,8 +1424,23 @@ def build_pdf(title, markdown_text):
     Spacer,
   )
 
+  # Standard PDF fonts only cover WinAnsi: LLM-typical smart punctuation
+  # (non-breaking hyphens, curly quotes…) renders as black boxes otherwise.
+  _PDF_FIXES = {
+    "\u2010": "-", "\u2011": "-", "\u2012": "-", "\u2013": "-",
+    "\u2014": "-", "\u2212": "-",
+    "\u2018": "'", "\u2019": "'", "\u201a": "'",
+    "\u201c": '"', "\u201d": '"', "\u201e": '"',
+    "\u2026": "...", "\u00a0": " ", "\u2022": "-",
+  }
+
+  def normalize_pdf_text(value):
+    for bad, good in _PDF_FIXES.items():
+      value = value.replace(bad, good)
+    return value
+
   def esc(value):
-    return _html.escape(value, quote=False)
+    return _html.escape(normalize_pdf_text(value), quote=False)
 
   def inline_html(text):
     out = []
@@ -1523,6 +1538,10 @@ def imagine_url(prompt, width=1024, height=1024, model="flux"):
 
 
 async def write_doc_markdown(topic, kind):
+  # Drop "(title the document ...)" style instructions so the model can't
+  # echo them into the heading.
+  topic = re.sub(r"\([^)]*title[^)]*\)", "", topic or "", flags=re.IGNORECASE)
+  topic = re.sub(r"\s{2,}", " ", topic).strip()
   instruction = (
     f"Write a well-structured {kind.upper()} document about: {topic}. "
     "Use markdown headings, bullet lists, and short paragraphs. "
