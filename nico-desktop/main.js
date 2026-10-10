@@ -133,8 +133,9 @@ function createWindow() {
     autoHideMenuBar: true,
     show: false,
     // Custom Nico chrome: no native frame, see the in-app title bar.
+    // Opaque window so the desktop never shows through.
     frame: false,
-    transparent: true,
+    backgroundColor: "#07050f",
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

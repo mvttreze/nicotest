@@ -311,12 +311,13 @@ body .conversation-menu-item span:last-child{overflow:hidden;text-overflow:ellip
 .admin-user-controls button:hover:not(:disabled){border-color:var(--accent)}
 .admin-user-controls button:disabled{opacity:.4;cursor:default}
 
-/* =================== frameless desktop frame =================== */
+/* =================== frameless desktop frame (opaque) =================== */
 #nicoTitlebar{display:none}
-body.is-desktop{display:flex;flex-direction:column;height:100dvh;overflow:hidden;background:transparent;padding:8px}
+body.is-desktop{display:flex;flex-direction:column;height:100dvh;overflow:hidden;background-color:#07050f;padding:8px}
+body.is-desktop:not(.custom-background){background:radial-gradient(55rem 36rem at 8% -6%,var(--accent-glow),transparent 62%),radial-gradient(46rem 34rem at 100% 12%,color-mix(in srgb,var(--accent-2) 26%,transparent),transparent 62%),radial-gradient(50rem 30rem at 55% 115%,rgba(53,216,255,.13),transparent 62%),var(--bg-main)}
 body.is-desktop::before{display:none}
 body.is-desktop #nicoTitlebar{display:flex;flex:0 0 38px;align-items:stretch;border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0;background:var(--surface);overflow:hidden;user-select:none;-webkit-user-select:none}
-body.is-desktop .app-layout{flex:1;min-height:0;height:auto;width:100%;padding:14px;gap:14px;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;background:linear-gradient(180deg,rgba(8,13,22,.32),rgba(5,10,17,.15))}
+body.is-desktop .app-layout{flex:1;min-height:0;height:auto;width:100%;padding:14px;gap:14px;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;background:none}
 body.is-desktop .main-content{height:auto;min-height:0}
 body.is-desktop.is-maximized{padding:0}
 body.is-desktop.is-maximized #nicoTitlebar{border-radius:0;border-left:0;border-right:0;border-top:0}
