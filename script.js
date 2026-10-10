@@ -3209,7 +3209,7 @@ async function maybeHandleLocalCommand(raw) {
   // Follow-ups on the latest generated image/doc ("change it…").
   // Must run before the generic generate/imagine branches below.
   let fm = cmd.match(
-    /^(?:can you\s+)?(?:change|edit|update|modify|regenerate|redo|remake)(?: it| this| that| the image| the document| the file| the pdf)?(?: to| into)?\s*(.*)$/i,
+    /^(?:can you\s+)?(?:change|edit|update|modify|regenerate|redo|remake|put|place|move|turn)(?: it| this| that| the image| the document| the file| the pdf)?(?: to| into)?\s*(.*)$/i,
   );
   let followKind = null;
   if (!fm) {
