@@ -1037,7 +1037,7 @@ async def generate_title(text: str, use_zen: bool = False):
   attempts = []
   if use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
     attempts.append(via_zen)
-  elif groq_client:
+  if groq_client:
     attempts.append(via_groq)
   for attempt in attempts:
     try:
@@ -1772,17 +1772,17 @@ async def chat_stream(
         yield full_reply
         models_to_try = []
       else:
+        models_to_try = []
         if can_use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
-          models_to_try = [("zen", name) for name in OPENCODE_MODELS]
-        elif groq_client:
-          models_to_try = [(
+          # Badged: Nemotron first, Groq as backup.
+          models_to_try += [("zen", name) for name in OPENCODE_MODELS]
+        if groq_client:
+          models_to_try.append((
             "groq",
             "openai/gpt-oss-20b"
             if request.settings.get("model") == "light"
             else "openai/gpt-oss-120b",
-          )]
-        else:
-          models_to_try = []
+          ))
       last_error = None
 
       for provider, model in models_to_try:
