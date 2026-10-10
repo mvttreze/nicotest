@@ -3613,28 +3613,34 @@ function setDeveloperDashboardVisibility(user) {
   dashboardButton.disabled = !visible;
 }
 
+let myBadgeLoadToken = 0;
 async function loadMyBadges() {
   const wrap = document.getElementById("identityBadges");
   if (!wrap) return;
+  const token = ++myBadgeLoadToken;
+  let badges = [];
+  if (currentUser) {
+    try {
+      const res = await apiFetch(`${apiBaseUrl}/auth/me`);
+      if (res.ok) badges = (await res.json()).badges || [];
+    } catch {}
+  }
+  // A newer load started while we awaited: drop this stale result instead
+  // of painting a duplicate set of chips.
+  if (token !== myBadgeLoadToken) return;
   wrap.querySelectorAll(".earned-badge").forEach((el) => el.remove());
-  if (!currentUser) return;
-  try {
-    const res = await apiFetch(`${apiBaseUrl}/auth/me`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const labels = {
-      tester: "Tester",
-      major_supporter: "Major Supporter",
-      supporter: "Supporter",
-    };
-    (data.badges || []).forEach((b) => {
-      if (b === "admin" || !labels[b]) return; // admin covered by Developer/Owner
-      const chip = document.createElement("span");
-      chip.className = `earned-badge badge-${b.replace(/[^a-z]/g, "")}`;
-      chip.textContent = labels[b];
-      wrap.appendChild(chip);
-    });
-  } catch {}
+  const labels = {
+    tester: "Tester",
+    major_supporter: "Major Supporter",
+    supporter: "Supporter",
+  };
+  (badges || []).forEach((b) => {
+    if (b === "admin" || !labels[b]) return; // admin covered by Developer/Owner
+    const chip = document.createElement("span");
+    chip.className = `earned-badge badge-${b.replace(/[^a-z]/g, "")}`;
+    chip.textContent = labels[b];
+    wrap.appendChild(chip);
+  });
 }
 
 function updateAuthUi(user) {
