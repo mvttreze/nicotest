@@ -2460,3 +2460,102 @@ button.export-btn:hover {
     color: var(--text-muted);
     overflow-wrap: anywhere;
 }
+
+.print-header {
+    display: none;
+}
+
+.export-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 12px;
+    z-index: 60;
+    width: min(300px, calc(100vw - 24px));
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    background: rgba(24, 25, 30, 0.97);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+}
+
+.export-dropdown.open {
+    display: flex;
+    animation: tool-bubble-in 0.18s ease-out both;
+}
+
+@media print {
+    body {
+        overflow: visible;
+        height: auto;
+        background: #ffffff;
+        color: #000000;
+    }
+    body::before {
+        display: none;
+    }
+    .sidebar,
+    .top-header,
+    .input-wrapper,
+    .settings-panel,
+    .vision-overlay,
+    .admin-dashboard-panel,
+    .scroll-jump,
+    .msg-actions,
+    .welcome-suggestions,
+    .composer-toast,
+    .reminder-dropdown,
+    .export-dropdown,
+    .announce-banner,
+    .mobile-menu-btn {
+        display: none !important;
+    }
+    .app-layout,
+    .main-content {
+        display: block;
+        height: auto;
+        width: auto;
+        padding: 0;
+    }
+    .chat-container {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        padding: 0 8px;
+    }
+    .chat-box {
+        display: block;
+        overflow: visible;
+        -webkit-mask-image: none;
+        mask-image: none;
+    }
+    .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 12px;
+        color: #000000;
+        font-size: 0.85rem;
+    }
+    .message {
+        break-inside: avoid;
+        max-width: 100% !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #dddddd !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    .message * {
+        color: #000000 !important;
+        text-shadow: none !important;
+        box-shadow: none !important;
+    }
+    .code-container pre {
+        white-space: pre-wrap;
+    }
+}

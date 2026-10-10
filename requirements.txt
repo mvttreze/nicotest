@@ -8,5 +8,6 @@ supabase
 pydantic
 pypdf
 python-docx
+reportlab
 requests
 httpx

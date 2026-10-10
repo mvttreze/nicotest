@@ -7,7 +7,7 @@ import re
 import uuid
 from datetime import datetime
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from groq import AsyncGroq
@@ -1241,6 +1241,386 @@ def edit_message(
       {"content": content}
   ).eq("id", found[0]["id"]).execute()
   return {"status": "success"}
+
+
+def md_to_blocks(markdown_text):
+  """Minimal markdown -> neutral blocks.
+
+  Returns a list of (kind, payload) where kind is one of
+  h1/h2/h3/p/quote/code/ul/ol/hr. Payload is str, or list[str] for
+  lists, or "" for hr.
+  """
+  blocks = []
+  lines = (markdown_text or "").replace("\r\n", "\n").split("\n")
+  i = 0
+  in_code = False
+  code_buf: list[str] = []
+  list_buf = None
+
+  def flush_list():
+    nonlocal list_buf
+    if list_buf:
+      blocks.append(list_buf)
+      list_buf = None
+
+  structural = re.compile(r"^(#{1,3}\s|[-*]\s|\d+[.)]\s|>\s?|---+$)")
+  while i < len(lines):
+    line = lines[i]
+    if line.strip().startswith("```"):
+      if in_code:
+        blocks.append(("code", "\n".join(code_buf)))
+        code_buf = []
+        in_code = False
+      else:
+        flush_list()
+        in_code = True
+      i += 1
+      continue
+    if in_code:
+      code_buf.append(line)
+      i += 1
+      continue
+    stripped = line.strip()
+    if not stripped:
+      flush_list()
+      i += 1
+      continue
+    heading = re.match(r"^(#{1,3})\s+(.*)$", stripped)
+    if heading:
+      flush_list()
+      blocks.append((f"h{len(heading.group(1))}", heading.group(2).strip()))
+      i += 1
+      continue
+    bullet = re.match(r"^[-*]\s+(.*)$", stripped)
+    if bullet:
+      if not list_buf or list_buf[0] != "ul":
+        flush_list()
+        list_buf = ("ul", [])
+      list_buf[1].append(bullet.group(1).strip())
+      i += 1
+      continue
+    numbered = re.match(r"^(\d+)[.)]\s+(.*)$", stripped)
+    if numbered:
+      if not list_buf or list_buf[0] != "ol":
+        flush_list()
+        list_buf = ("ol", [])
+      list_buf[1].append(numbered.group(2).strip())
+      i += 1
+      continue
+    quote = re.match(r"^>\s?(.*)$", stripped)
+    if quote:
+      flush_list()
+      blocks.append(("quote", quote.group(1)))
+      i += 1
+      continue
+    if re.match(r"^---+$", stripped):
+      flush_list()
+      blocks.append(("hr", ""))
+      i += 1
+      continue
+    flush_list()
+    para = [stripped]
+    i += 1
+    while i < len(lines):
+      nxt = lines[i].strip()
+      if not nxt or nxt.startswith("```") or structural.match(nxt):
+        break
+      para.append(nxt)
+      i += 1
+    blocks.append(("p", " ".join(para)))
+  if in_code:
+    blocks.append(("code", "\n".join(code_buf)))
+  flush_list()
+  return blocks
+
+
+def split_inline(text):
+  """Split into (style, chunk); style is '', 'b', 'i' or 'code'."""
+  parts = []
+  pattern = re.compile(r"(\*\*.+?\*\*|\*[^*]+?\*|`[^`]+?`)")
+  pos = 0
+  text = text or ""
+  for match in pattern.finditer(text):
+    if match.start() > pos:
+      parts.append(("", text[pos:match.start()]))
+    token = match.group(0)
+    if token.startswith("**"):
+      parts.append(("b", token[2:-2]))
+    elif token.startswith("`"):
+      parts.append(("code", token[1:-1]))
+    else:
+      parts.append(("i", token[1:-1]))
+    pos = match.end()
+  if pos < len(text):
+    parts.append(("", text[pos:]))
+  return [part for part in parts if part[1]]
+
+
+def _add_docx_runs(paragraph, text, italic=False):
+  for style, chunk in split_inline(text):
+    run = paragraph.add_run(chunk)
+    if style == "b":
+      run.bold = True
+    elif style == "i" or italic:
+      run.italic = True
+    elif style == "code":
+      run.font.name = "Consolas"
+
+
+def build_docx(title, markdown_text):
+  from docx.shared import Pt
+
+  doc = Document()
+  normal = doc.styles["Normal"]
+  normal.font.name = "Calibri"
+  normal.font.size = Pt(11)
+  if (title or "").strip():
+    doc.add_heading(title.strip(), level=0)
+  for kind, payload in md_to_blocks(markdown_text):
+    if kind in ("h1", "h2", "h3"):
+      heading = doc.add_heading(level=int(kind[1]))
+      _add_docx_runs(heading, payload)
+    elif kind == "p":
+      paragraph = doc.add_paragraph()
+      _add_docx_runs(paragraph, payload)
+    elif kind == "quote":
+      from docx.shared import Pt as _Pt
+
+      paragraph = doc.add_paragraph()
+      paragraph.paragraph_format.left_indent = _Pt(18)
+      _add_docx_runs(paragraph, payload, italic=True)
+    elif kind == "code":
+      paragraph = doc.add_paragraph()
+      run = paragraph.add_run(payload)
+      run.font.name = "Consolas"
+      run.font.size = Pt(9)
+    elif kind in ("ul", "ol"):
+      for item in payload:
+        paragraph = doc.add_paragraph(
+          style="List Bullet" if kind == "ul" else "List Number"
+        )
+        _add_docx_runs(paragraph, item)
+    elif kind == "hr":
+      doc.add_paragraph("—" * 12)
+  buf = io.BytesIO()
+  doc.save(buf)
+  buf.seek(0)
+  return buf.getvalue()
+
+
+def build_pdf(title, markdown_text):
+  import html as _html
+
+  from reportlab.lib.pagesizes import LETTER
+  from reportlab.lib.styles import ParagraphStyle
+  from reportlab.lib.units import inch
+  from reportlab.platypus import (
+    HRFlowable,
+    ListFlowable,
+    ListItem,
+    Paragraph,
+    Preformatted,
+    SimpleDocTemplate,
+    Spacer,
+  )
+
+  def esc(value):
+    return _html.escape(value, quote=False)
+
+  def inline_html(text):
+    out = []
+    for style, chunk in split_inline(text):
+      chunk = esc(chunk)
+      if style == "b":
+        out.append(f"<b>{chunk}</b>")
+      elif style == "i":
+        out.append(f"<i>{chunk}</i>")
+      elif style == "code":
+        out.append(f'<font face="Courier" size="9">{chunk}</font>')
+      else:
+        out.append(chunk)
+    return "".join(out) or " "
+
+  base = ParagraphStyle("Base", fontName="Helvetica", fontSize=11, leading=15)
+  title_style = ParagraphStyle(
+    "DocTitle", parent=base, fontSize=22, leading=26, spaceAfter=12
+  )
+  heading_styles = {
+    "h1": ParagraphStyle("H1", parent=base, fontSize=18, leading=22, spaceBefore=10, spaceAfter=6),
+    "h2": ParagraphStyle("H2", parent=base, fontSize=15, leading=19, spaceBefore=8, spaceAfter=5),
+    "h3": ParagraphStyle("H3", parent=base, fontSize=13, leading=17, spaceBefore=6, spaceAfter=4),
+  }
+  quote_style = ParagraphStyle(
+    "Quote", parent=base, leftIndent=18, textColor="#555555"
+  )
+  code_style = ParagraphStyle(
+    "Code", parent=base, fontName="Courier", fontSize=9, leading=12,
+    backColor="#F2F2F2", borderPadding=6,
+  )
+  story = []
+  if (title or "").strip():
+    story += [Paragraph(esc(title.strip()), title_style), Spacer(1, 0.1 * inch)]
+  for kind, payload in md_to_blocks(markdown_text):
+    if kind in heading_styles:
+      story.append(Paragraph(inline_html(payload), heading_styles[kind]))
+    elif kind == "p":
+      story.append(Paragraph(inline_html(payload), base))
+    elif kind == "quote":
+      story.append(Paragraph(f"<i>{inline_html(payload)}</i>", quote_style))
+    elif kind == "code":
+      story.append(Preformatted(esc(payload).replace("\n", "<br/>"), code_style))
+    elif kind in ("ul", "ol"):
+      story.append(
+        ListFlowable(
+          [ListItem(Paragraph(inline_html(item), base)) for item in payload],
+          bulletType="bullet" if kind == "ul" else "1",
+          leftIndent=24,
+        )
+      )
+    elif kind == "hr":
+      story.append(HRFlowable(width="100%"))
+    story.append(Spacer(1, 0.08 * inch))
+  buf = io.BytesIO()
+  SimpleDocTemplate(
+    buf, pagesize=LETTER, topMargin=0.8 * inch, bottomMargin=0.8 * inch
+  ).build(story)
+  buf.seek(0)
+  return buf.getvalue()
+
+
+def slug_filename(name, ext):
+  safe = re.sub(r"[^A-Za-z0-9-_]+", "-", (name or "nico").strip()).strip("-") or "nico"
+  return f"{safe[:60]}.{ext}"
+
+
+def imagine_url(prompt, width=1024, height=1024, model="flux"):
+  import urllib.parse
+
+  text = (prompt or "").strip()
+  if len(text) < 3:
+    raise HTTPException(status_code=400, detail="Describe the image first")
+  if len(text) > 500:
+    text = text[:500]
+  try:
+    width = max(256, min(int(width or 1024), 2048))
+    height = max(256, min(int(height or 1024), 2048))
+  except (TypeError, ValueError):
+    width, height = 1024, 1024
+  if model not in ("flux", "turbo"):
+    model = "flux"
+  seed = uuid.uuid4().int % 10_000_000
+  return {
+    "image_url": (
+      f"https://image.pollinations.ai/prompt/{urllib.parse.quote(text)}"
+      f"?width={width}&height={height}&seed={seed}&nologo=true&model={model}"
+    ),
+    "prompt": text,
+    "model": model,
+    "width": width,
+    "height": height,
+    "seed": seed,
+  }
+
+
+async def write_doc_markdown(topic, kind):
+  instruction = (
+    f"Write a well-structured {kind.upper()} document about: {topic}. "
+    "Use markdown headings, bullet lists, and short paragraphs. "
+    "Output only the document, no preamble."
+  )
+  if groq_client:
+    try:
+      response = await groq_client.chat.completions.create(
+        messages=[{"role": "user", "content": instruction}],
+        model="openai/gpt-oss-20b",
+        max_tokens=2000,
+      )
+      text = (response.choices[0].message.content or "").strip()
+      if text:
+        return text
+    except Exception:
+      pass
+  if OPENCODE_API_KEY and OPENCODE_MODELS:
+    try:
+      text = (
+        await zen_chat_once(
+          OPENCODE_MODELS[0], [{"role": "user", "content": instruction}]
+        )
+      ).strip()
+      if text:
+        return text
+    except Exception:
+      pass
+  raise HTTPException(status_code=503, detail="No model available to write the document")
+
+
+class ExportDocRequest(BaseModel):
+  title: str = "Nico"
+  markdown: str = ""
+
+
+class ImagineRequest(BaseModel):
+  prompt: str = ""
+  width: int = 1024
+  height: int = 1024
+  model: str = "flux"
+
+
+class GenerateDocRequest(BaseModel):
+  topic: str = ""
+  kind: str = "pdf"
+
+
+@app.post("/export/docx")
+def export_docx(request: ExportDocRequest):
+  data = build_docx(request.title[:120], request.markdown or "")
+  return Response(
+    content=data,
+    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    headers={
+      "Content-Disposition": f'attachment; filename="{slug_filename(request.title, "docx")}"'
+    },
+  )
+
+
+@app.post("/export/pdf")
+def export_pdf(request: ExportDocRequest):
+  data = build_pdf(request.title[:120], request.markdown or "")
+  return Response(
+    content=data,
+    media_type="application/pdf",
+    headers={
+      "Content-Disposition": f'attachment; filename="{slug_filename(request.title, "pdf")}"'
+    },
+  )
+
+
+@app.post("/imagine")
+def imagine(request: ImagineRequest):
+  return imagine_url(request.prompt, request.width, request.height, request.model)
+
+
+@app.post("/export/generate")
+async def export_generate(request: GenerateDocRequest):
+  topic = (request.topic or "").strip()
+  if len(topic) < 3:
+    raise HTTPException(status_code=400, detail="Give a topic first")
+  kind = "docx" if request.kind.lower() in ("docx", "word", "doc") else "pdf"
+  markdown_text = await write_doc_markdown(topic, kind)
+  title = topic[:120]
+  if kind == "docx":
+    data = build_docx(title, markdown_text)
+    return Response(
+      content=data,
+      media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      headers={"Content-Disposition": f'attachment; filename="{slug_filename(title, "docx")}"'},
+    )
+  data = build_pdf(title, markdown_text)
+  return Response(
+    content=data,
+    media_type="application/pdf",
+    headers={"Content-Disposition": f'attachment; filename="{slug_filename(title, "pdf")}"'},
+  )
 
 
 def get_user_memories(user):

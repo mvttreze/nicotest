@@ -3043,7 +3043,199 @@ async function maybeHandleLocalCommand(raw) {
     await runBriefing();
     return true;
   }
+  let m;
+  if (
+    (m = text.match(
+      /^(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
+    )) ||
+    (m = text.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)$/i))
+  ) {
+    let fmt = (m[m.length - 1] || "").toLowerCase();
+    if (fmt === "doc") fmt = "docx";
+    if (fmt === "md") fmt = "markdown";
+    appendMessage("user", text, []);
+    if (fmt === "pdf") exportCurrentPdf(true);
+    else if (fmt === "word" || fmt === "docx") await exportCurrentDocx(true);
+    else if (fmt === "json") exportChatJson();
+    else exportChat();
+    return true;
+  }
+  if (
+    (m = text.match(
+      /^(generate|create|write|make) a (pdf|word|docx|document)( about| on| of| for)? (.+)$/i,
+    ))
+  ) {
+    const kind = m[2].toLowerCase() === "document" ? "pdf" : m[2].toLowerCase();
+    await handleGenerateDoc(kind, (m[4] || "").trim());
+    return true;
+  }
+  if (
+    (m = text.match(
+      /^(?:please\s+)?(draw|paint|sketch|generate an image of|create an image of|make an image of|picture of|imagine)\s+(.+)$/i,
+    ))
+  ) {
+    await handleImagine((m[2] || "").trim());
+    return true;
+  }
   return false;
+}
+
+/* ---------- exports: pdf / word / images (all free) ---------- */
+function chatToMarkdown() {
+  const lines = Array.from(
+    chatBox.querySelectorAll(".message:not(.thinking-indicator)"),
+  ).map((msg) => {
+    const role = msg.classList.contains("user") ? "User" : "Nico";
+    const content = msg.querySelector(".content")?.innerText || "";
+    return `**${role}:**\n${content}\n`;
+  });
+  return `# Nico conversation — ${new Date().toLocaleString()}\n\n${lines.join("\n---\n\n")}`;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function toggleExportMenu(force) {
+  const panel = document.getElementById("exportDropdown");
+  const btn = document.getElementById("exportBtn");
+  if (!panel) return;
+  const open = force !== undefined ? force : !panel.classList.contains("open");
+  toggleReminderPanel(false);
+  panel.classList.toggle("open", open);
+  panel.setAttribute("aria-hidden", String(!open));
+  btn?.setAttribute("aria-expanded", String(open));
+}
+
+function stampPrintHeader() {
+  const head = document.getElementById("printHeader");
+  if (head) {
+    head.textContent = `Nico conversation — ${new Date().toLocaleString()}`;
+  }
+}
+
+function exportCurrentPdf() {
+  toggleExportMenu(false);
+  if (!chatBox.querySelector(".message:not(.thinking-indicator)")) {
+    alert("No messages to export.");
+    return;
+  }
+  stampPrintHeader();
+  window.print();
+}
+
+async function exportCurrentDocx(fromChat) {
+  if (!fromChat) toggleExportMenu(false);
+  if (!chatBox.querySelector(".message:not(.thinking-indicator)")) {
+    alert("No messages to export.");
+    return;
+  }
+  showComposerToast("Building Word document…");
+  try {
+    const res = await fetch(`${apiBaseUrl}/export/docx`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: `Nico chat ${new Date().toLocaleDateString()}`,
+        markdown: chatToMarkdown(),
+      }),
+    });
+    if (!res.ok) throw new Error("build failed");
+    downloadBlob(
+      await res.blob(),
+      `nico-chat-${currentConversationId.slice(0, 8)}.docx`,
+    );
+  } catch {
+    showComposerToast("Couldn't build that file");
+  }
+}
+
+function showThinking() {
+  ensureTypingIndicator();
+  const indicator = document.getElementById("typingIndicator");
+  if (indicator) {
+    setResponsePhase(indicator, null, "thinking");
+    chatBox.appendChild(indicator);
+  }
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function hideThinking() {
+  const indicator = document.getElementById("typingIndicator");
+  if (indicator) {
+    setThinkingIndicator(indicator, false);
+    indicator.remove();
+  }
+}
+
+async function handleGenerateDoc(kind, topic) {
+  appendMessage("user", `Make a ${kind} about ${topic}`, []);
+  if (!topic) {
+    appendMessage("assistant", "Give me a topic first — e.g. `make a pdf about sourdough`.", []);
+    return;
+  }
+  showThinking();
+  try {
+    const res = await fetch(`${apiBaseUrl}/export/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, kind }),
+    });
+    if (!res.ok) throw new Error("build failed");
+    const ext = kind === "docx" ? "docx" : "pdf";
+    const safe = topic.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "nico";
+    downloadBlob(await res.blob(), `${safe}.${ext}`);
+    appendMessage("assistant", `Here's your ${ext.toUpperCase()} on **${topic}** — downloading now.`, []);
+  } catch {
+    appendMessage("assistant", "I couldn't build that file — try again.", []);
+  } finally {
+    hideThinking();
+  }
+}
+
+async function handleImagine(prompt) {
+  appendMessage("user", prompt, []);
+  if (!prompt) {
+    appendMessage("assistant", "Describe the image first — e.g. `draw a robot at sunset`.", []);
+    return;
+  }
+  showThinking();
+  try {
+    const res = await fetch(`${apiBaseUrl}/imagine`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    if (!res.ok) throw new Error("render failed");
+    const data = await res.json();
+    appendMessage("assistant", `**${data.prompt || prompt}**`, [
+      {
+        name: "nico-image.jpg",
+        mime_type: "image/jpeg",
+        data_url: data.image_url,
+      },
+    ]);
+    if (currentUser) {
+      await saveConversationAttachments([
+        {
+          name: "nico-image.jpg",
+          mime_type: "image/jpeg",
+          data_url: data.image_url,
+        },
+      ]);
+    }
+  } catch {
+    appendMessage("assistant", "I couldn't render that image — try again in a bit.", []);
+  } finally {
+    hideThinking();
+  }
 }
 
 async function sendMessage() {
@@ -3372,26 +3564,37 @@ function handleCommand(commandText) {
 }
 
 function exportChat() {
-  const messages = Array.from(chatBox.querySelectorAll(".message:not(.thinking-indicator)")).map(
-    (msg) => {
-      const isUser = msg.classList.contains("user");
-      const role = isUser ? "User" : "Nico";
-      const content = msg.querySelector(".content")?.innerText || "";
-      return `**${role}:**\n${content}\n`;
-    },
-  );
+  const messages = Array.from(chatBox.querySelectorAll(".message:not(.thinking-indicator)"));
 
   if (messages.length === 0) return alert("No messages to export.");
 
-  const blob = new Blob([messages.join("\n---\n\n")], {
-    type: "text/markdown",
+  downloadBlob(new Blob([chatToMarkdown()], { type: "text/markdown" }), `chat-${currentConversationId}.md`);
+}
+
+function wireExportMenu() {
+  document.getElementById("exportBtn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleExportMenu();
   });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `chat-${currentConversationId}.md`;
-  a.click();
-  URL.revokeObjectURL(url);
+  document.getElementById("exportMdBtn")?.addEventListener("click", () => {
+    toggleExportMenu(false);
+    exportChat();
+  });
+  document.getElementById("exportJsonBtn")?.addEventListener("click", () => {
+    toggleExportMenu(false);
+    exportChatJson();
+  });
+  document.getElementById("exportPdfBtn")?.addEventListener("click", exportCurrentPdf);
+  document.getElementById("exportDocxBtn")?.addEventListener("click", () => exportCurrentDocx(false));
+  document.addEventListener("click", (event) => {
+    if (
+      !event.target.closest("#exportBtn") &&
+      !event.target.closest("#exportDropdown")
+    ) {
+      toggleExportMenu(false);
+    }
+  });
+  window.addEventListener("beforeprint", stampPrintHeader);
 }
 
 function downloadFile(filename, content, type) {
@@ -4531,6 +4734,7 @@ initializeSettingsPanel();
 initializeAuthScreen();
 initializeAuth();
 bootReminders();
+wireExportMenu();
 refreshAnnouncement();
 setInterval(refreshAnnouncement, 60000);
 focusInput();

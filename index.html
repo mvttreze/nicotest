@@ -22,8 +22,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
-    <link rel="stylesheet" href="style.css?v=fix15">
-    <link rel="stylesheet" href="nico-redesign.css?v=fix15">
+    <link rel="stylesheet" href="style.css?v=fix17">
+    <link rel="stylesheet" href="nico-redesign.css?v=fix17">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
@@ -139,12 +139,31 @@
             <button class="mobile-menu-btn" id="menu-toggle" type="button" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button>
             <div class="top-header-actions">
                 <button id="reminderBtn" class="icon-btn reminder-btn" type="button" aria-label="Reminders" aria-expanded="false" aria-controls="reminderDropdown" title="Reminders">🔔<span id="reminderBadge" class="reminder-badge" hidden>0</span></button>
-                <button id="exportBtn" class="export-btn" onclick="exportChat()" title="Export Chat History">
-                    ⬇ Export Chat
+                <button id="exportBtn" class="export-btn" type="button" aria-expanded="false" aria-controls="exportDropdown" title="Export options">
+                    ⬇ Export
                 </button>
                 <span class="model-badge">Nico v2 • System OS</span>
             </div>
             <div class="reminder-dropdown" id="reminderDropdown" aria-hidden="true"></div>
+            <div class="export-dropdown" id="exportDropdown" aria-hidden="true" role="menu" aria-label="Export chat">
+                <p class="composer-menu-heading">Export chat</p>
+                <button class="dropdown-item" id="exportMdBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">📝</span>
+                    <span class="dropdown-text"><span class="dropdown-title">Markdown</span><span class="dropdown-sub">Plain .md file</span></span>
+                </button>
+                <button class="dropdown-item" id="exportJsonBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">{ }</span>
+                    <span class="dropdown-text"><span class="dropdown-title">JSON</span><span class="dropdown-sub">Raw messages</span></span>
+                </button>
+                <button class="dropdown-item" id="exportPdfBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">🖨️</span>
+                    <span class="dropdown-text"><span class="dropdown-title">PDF</span><span class="dropdown-sub">Print / save as PDF</span></span>
+                </button>
+                <button class="dropdown-item" id="exportDocxBtn" type="button" role="menuitem">
+                    <span class="dropdown-icon" aria-hidden="true">📄</span>
+                    <span class="dropdown-text"><span class="dropdown-title">Word</span><span class="dropdown-sub">.docx document</span></span>
+                </button>
+            </div>
         </header>
 
         <section class="settings-panel" id="settingsPanel" aria-hidden="true">
@@ -312,6 +331,7 @@
         </aside>
 
         <div class="chat-container">
+            <div class="print-header" id="printHeader" aria-hidden="true"></div>
             <!-- Gemini-style Welcome Screen -->
             <div id="welcomeScreen" class="welcome-container">
                 <h1 class="welcome-title">Hello, <span id="welcomeName">User</span></h1>
@@ -383,7 +403,7 @@
     </main>
 </div>
 
-<script src="script.js?v=fix16"></script>
+<script src="script.js?v=fix17"></script>
 <script src="nico-ui.js"></script>
 <script>
     if ("serviceWorker" in navigator) {
