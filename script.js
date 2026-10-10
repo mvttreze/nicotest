@@ -3062,6 +3062,81 @@ function maybeResumeWake() {
 }
 
 /* ---------- local command dispatcher (before the backend) ---------- */
+const IMAGINE_NOUNS = "images?|pictures?|photos?|photographs?|drawings?|paintings?|portraits?|sketches?|illustrations?|artworks?|art|logos?|wallpapers?|avatars?|icons?|posters?|comics?|memes?|doodles?";
+const IMAGINE_VERBS = "draw|paint|sketch|imagine|generate|create|make|give|produce|render|design|show";
+const IMAGINE_SOLO_VERBS = "draw|paint|sketch|imagine";
+const DOC_NOUNS = "pdfs?|docx?|docs?|documents?|reports?|files?|letters?|essays?|resumes?|articles?|stories?|poems?";
+const DOC_VERBS = "generate|create|write|make|draft|compose|produce|prepare|build";
+const QUESTION_STARTERS = "how|what|why|when|where|which|who|explain|define|describe|tell me|talk about|meaning of";
+
+function stripPoliteness(s) {
+  return String(s || "")
+    .replace(/^(?:please\s+|can you\s+|could you\s+|would you\s+)?/i, "")
+    .trim();
+}
+
+function isQuestion(s) {
+  return new RegExp(`^(${QUESTION_STARTERS})\\b`, "i").test(String(s || "").trim());
+}
+
+function cleanPrompt(s) {
+  return String(s || "")
+    .trim()
+    .replace(/\s*[?.!]+$/, "")
+    .replace(/^(me|us)\s+/i, "")
+    .replace(/^(me|us)$/i, "")
+    .replace(/\s+(me|us)$/i, "")
+    .replace(/^(for|of|about|on)\s+/i, "")
+    .trim();
+}
+
+// Returns {prompt} | {ask:true} | null. Pure (testable, no DOM).
+function matchImagineIntent(raw) {
+  const text = stripPoliteness(raw);
+  if (!text || isQuestion(text)) return null;
+  const lower = ` ${text.toLowerCase()} `;
+  const hasNoun = new RegExp(`\\b(${IMAGINE_NOUNS})\\b`, "i").test(text);
+  const hasVerb = new RegExp(`\\b(${IMAGINE_VERBS})\\b`, "i").test(text);
+  const soloVerb = new RegExp(`\\b(${IMAGINE_SOLO_VERBS})\\b`, "i").exec(text);
+  // Noun-first: cleanest prompt ("a picture of X" -> "X").
+  if (hasVerb && hasNoun) {
+    const afterNoun = text.replace(
+      new RegExp(`^.*?\\b(?:${IMAGINE_NOUNS})\\b\\s*(?:of|for|about|depicting|showing)?\\s*`, "i"),
+      "",
+    );
+    const prompt = cleanPrompt(afterNoun);
+    if (prompt) return { prompt };
+  }
+  // Bare strong verbs ("draw a robot", "imagine dragons").
+  if (soloVerb) {
+    const afterVerb = text.slice(soloVerb.index + soloVerb[0].length);
+    const prompt = cleanPrompt(afterVerb);
+    if (prompt) return { prompt };
+    return { ask: true };
+  }
+  if (hasVerb && hasNoun) return { ask: true };
+  return null;
+}
+
+// Returns {kind, topic} | {ask:true} | null. Pure (testable, no DOM).
+function matchDocIntent(raw) {
+  const text = stripPoliteness(raw);
+  if (!text || isQuestion(text)) return null;
+  const hasNoun = new RegExp(`\\b(${DOC_NOUNS})\\b`, "i").test(text);
+  const hasVerb = new RegExp(`\\b(${DOC_VERBS})\\b`, "i").test(text);
+  if (!hasNoun || !hasVerb) return null;
+  const fmt = text.match(/\b(pdf|docx)\b/i);
+  const wordish = /\b(words?|docs?|resumes?|letters?)\b/i.test(text);
+  const kind = fmt ? fmt[1].toLowerCase().replace(/^doc$/, "docx") : wordish ? "docx" : "pdf";
+  let topic = text.replace(
+    new RegExp(`^.*?\\b(?:${DOC_NOUNS})\\b\\s*(?:about|on|of|for)?\\s*`, "i"),
+    "",
+  );
+  topic = cleanPrompt(topic.replace(/^(and|with)\s+/i, ""));
+  if (topic) return { kind, topic };
+  return { ask: true };
+}
+
 async function maybeHandleLocalCommand(raw) {
   const text = (raw || "").trim();
   if (!text) return false;
@@ -3074,7 +3149,7 @@ async function maybeHandleLocalCommand(raw) {
     return await handleReminderSend(cmd);
   }
   if (/^cancel all reminders$/i.test(cmd)) {
-    appendMessage("user", cmd, []);
+    appendMessage("user", text, []);
     const n = readReminders().filter((r) => !r.done).length;
     writeReminders([]);
     reminderTimers.forEach((t) => clearTimeout(t));
@@ -3100,7 +3175,7 @@ async function maybeHandleLocalCommand(raw) {
   }
   const cityM = cmd.match(/^(?:set(?: my)? city (?:to|as) |my city is )(.{2,60})$/i);
   if (cityM) {
-    appendMessage("user", cmd, []);
+    appendMessage("user", text, []);
     settings.briefCity = cityM[1].trim();
     saveSettings();
     appendMessage(
@@ -3124,7 +3199,7 @@ async function maybeHandleLocalCommand(raw) {
     let fmt = (m[m.length - 1] || "").toLowerCase();
     if (fmt === "doc") fmt = "docx";
     if (fmt === "md") fmt = "markdown";
-    appendMessage("user", cmd, []);
+    appendMessage("user", text, []);
     if (fmt === "pdf") exportCurrentPdf(true);
     else if (fmt === "word" || fmt === "docx") await exportCurrentDocx(true);
     else if (fmt === "json") exportChatJson();
@@ -3151,6 +3226,13 @@ async function maybeHandleLocalCommand(raw) {
       followKind = "image";
     }
   }
+  if (!fm) {
+    const dm = cmd.match(/^(?:draw|paint|sketch|redraw|repaint) (it|this|that|them)\s*(.*)$/i);
+    if (dm) {
+      fm = [dm[0], (dm[2] || "").trim() || "again"];
+      followKind = "image";
+    }
+  }
   if (fm) {
     const rest = (fm[fm.length - 1] || "").trim();
     const ref = cmd.match(/\b(image|picture|photo|document|file|pdf|docx?|doc)\b/i);
@@ -3161,10 +3243,12 @@ async function maybeHandleLocalCommand(raw) {
     const last = findLastGen(want);
     if (last && rest) {
       if (last.type === "image") {
-        await handleImagine(`${rest} (variation of: ${last.prompt})`, text);
+        const base = /^again$/i.test(rest) ? last.prompt : `${rest} (variation of: ${last.prompt})`;
+        await handleImagine(base, text);
         return true;
       }
-      await handleGenerateDoc(last.kind || "pdf", `${rest} (revising: ${last.topic})`, text);
+      const base = /^again$/i.test(rest) ? last.topic : `${rest} (revising: ${last.topic})`;
+      await handleGenerateDoc(last.kind || "pdf", base, text);
       return true;
     }
     if (last && !rest) {
@@ -3180,24 +3264,24 @@ async function maybeHandleLocalCommand(raw) {
     }
     // No generated context: let the backend answer normally.
   }
-  if (
-    (m = cmd.match(
-      /^(?:please\s+|can you\s+)?(?:generate|create|write|make)(?: me)? a (pdf|word|docx|doc|document|report)(?: document| file| doc)?(?: about| on| of| for)?(.*)$/i,
-    ))
-  ) {
-    let kind = (m[1] || "").toLowerCase();
-    if (kind === "doc" || kind === "word") kind = "docx";
-    if (kind === "document" || kind === "report") kind = "pdf";
-    const topic = ((m[2] || "").trim().replace(/^(and|with)\s+/i, ""));
-    await handleGenerateDoc(kind, topic, text);
+  const imgIntent = matchImagineIntent(cmd);
+  if (imgIntent) {
+    if (imgIntent.ask) {
+      appendMessage("user", text, []);
+      appendMessage("assistant", "Describe the image first — e.g. `draw a robot at sunset`.", []);
+      return true;
+    }
+    await handleImagine(imgIntent.prompt, text);
     return true;
   }
-  if (
-    (m = cmd.match(
-      /^(?:please\s+|can you\s+)?(?:(?:draw|paint|sketch)(?: me)?|(?:generate|create|make|give)(?: me)? an image of|(?:generate|create|make|give)(?: me)? a picture of|picture of|imagine)\s*(.*)$/i,
-    ))
-  ) {
-    await handleImagine((m[1] || "").trim().replace(/\s*[?.!]+$/, ""), text);
+  const docIntent = matchDocIntent(cmd);
+  if (docIntent) {
+    if (docIntent.ask) {
+      appendMessage("user", text, []);
+      appendMessage("assistant", "What should the document cover? (e.g. `write a pdf about sourdough`)", []);
+      return true;
+    }
+    await handleGenerateDoc(docIntent.kind, docIntent.topic, text);
     return true;
   }
   return false;
