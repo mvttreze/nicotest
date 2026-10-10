@@ -3046,9 +3046,9 @@ async function maybeHandleLocalCommand(raw) {
   let m;
   if (
     (m = text.match(
-      /^(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
+      /^(?:please\s+)?(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
     )) ||
-    (m = text.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)$/i))
+    (m = text.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)(?: doc| document| file)?$/i))
   ) {
     let fmt = (m[m.length - 1] || "").toLowerCase();
     if (fmt === "doc") fmt = "docx";
@@ -3062,19 +3062,21 @@ async function maybeHandleLocalCommand(raw) {
   }
   if (
     (m = text.match(
-      /^(generate|create|write|make) a (pdf|word|docx|document)( about| on| of| for)? (.+)$/i,
+      /^(?:please\s+|can you\s+)?(?:generate|create|write|make)(?: me)? a (pdf|word|docx|doc|document|report)(?: document| file| doc)?(?: about| on| of| for)?(.*)$/i,
     ))
   ) {
-    const kind = m[2].toLowerCase() === "document" ? "pdf" : m[2].toLowerCase();
-    await handleGenerateDoc(kind, (m[4] || "").trim());
+    let kind = (m[1] || "").toLowerCase();
+    if (kind === "doc" || kind === "word") kind = "docx";
+    if (kind === "document" || kind === "report") kind = "pdf";
+    await handleGenerateDoc(kind, (m[2] || "").trim());
     return true;
   }
   if (
     (m = text.match(
-      /^(?:please\s+)?(draw|paint|sketch|generate an image of|create an image of|make an image of|picture of|imagine)\s+(.+)$/i,
+      /^(?:please\s+)?(?:draw|paint|sketch|generate an image of|create an image of|make an image of|picture of|imagine)\s*(.*)$/i,
     ))
   ) {
-    await handleImagine((m[2] || "").trim());
+    await handleImagine((m[1] || "").trim());
     return true;
   }
   return false;
