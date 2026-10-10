@@ -310,6 +310,24 @@ body .conversation-menu-item span:last-child{overflow:hidden;text-overflow:ellip
 .admin-user-controls button{border-radius:9px;border:1px solid var(--line);background:transparent;color:inherit;font:600 .7rem var(--ui);padding:.35rem .8rem;cursor:pointer}
 .admin-user-controls button:hover:not(:disabled){border-color:var(--accent)}
 .admin-user-controls button:disabled{opacity:.4;cursor:default}
+
+/* =================== frameless desktop frame =================== */
+#nicoTitlebar{display:none}
+body.is-desktop{display:flex;flex-direction:column;height:100dvh;overflow:hidden;background:transparent;padding:8px}
+body.is-desktop::before{display:none}
+body.is-desktop #nicoTitlebar{display:flex;flex:0 0 38px;align-items:stretch;border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0;background:var(--surface);overflow:hidden;user-select:none;-webkit-user-select:none}
+body.is-desktop .app-layout{flex:1;min-height:0;height:auto;width:100%;padding:14px;gap:14px;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;background:linear-gradient(180deg,rgba(8,13,22,.32),rgba(5,10,17,.15))}
+body.is-desktop .main-content{height:auto;min-height:0}
+body.is-desktop.is-maximized{padding:0}
+body.is-desktop.is-maximized #nicoTitlebar{border-radius:0;border-left:0;border-right:0;border-top:0}
+body.is-desktop.is-maximized .app-layout{border-radius:0;border-left:0;border-right:0;border-bottom:0}
+.titlebar-drag{flex:1;display:flex;align-items:center;gap:9px;padding:0 12px;min-width:0;-webkit-app-region:drag}
+.titlebar-mark{display:inline-grid;place-items:center;width:22px;height:22px;flex:0 0 22px}
+.titlebar-title{font:700 .78rem var(--ui);letter-spacing:.14em;color:var(--text-primary);white-space:nowrap}
+.titlebar-controls{display:flex;align-items:stretch;-webkit-app-region:no-drag}
+.titlebar-btn{width:46px;border:0;background:transparent;color:var(--text-muted);cursor:pointer;display:grid;place-items:center;transition:background .15s,color .15s}
+.titlebar-btn:hover{background:var(--panel);color:var(--text-primary)}
+.titlebar-close:hover{background:#e81123;color:#fff}
 .admin-toolbar select.admin-search{max-width:150px}
 .admin-toolbar select.admin-search option{background:#161026;color:#f1ecff}
 

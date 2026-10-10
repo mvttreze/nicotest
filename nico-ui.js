@@ -294,3 +294,87 @@
     });
   }
 })();
+
+/* ---------- frameless desktop title bar (Electron only) ---------- */
+(function () {
+  const shell = window.nicoDesktop;
+  if (!shell || typeof shell.window !== "function") return;
+  document.body.classList.add("is-desktop");
+
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const svgIcon = (paths) => {
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("width", "11");
+    svg.setAttribute("height", "11");
+    svg.setAttribute("viewBox", "0 0 12 12");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.4");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("aria-hidden", "true");
+    paths.forEach((d) => {
+      const p = document.createElementNS(SVGNS, "path");
+      p.setAttribute("d", d);
+      svg.appendChild(p);
+    });
+    return svg;
+  };
+
+  const bar = document.createElement("div");
+  bar.id = "nicoTitlebar";
+
+  const left = document.createElement("div");
+  left.className = "titlebar-drag";
+  const mark = document.createElement("span");
+  mark.className = "titlebar-mark";
+  mark.innerHTML =
+    '<svg width="18" height="18" viewBox="0 0 512 512" aria-hidden="true"><rect x="42" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><rect x="455" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" style="fill:var(--accent)"/><path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" style="fill:var(--accent)"/><path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" style="fill:var(--accent)"/><rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/><circle cx="210" cy="250" r="34" style="fill:var(--accent)"/><circle cx="302" cy="250" r="34" style="fill:var(--accent)"/><path d="M238 296 Q256 312 274 296" fill="none" style="stroke:var(--accent)" stroke-width="22" stroke-linecap="round"/></svg>';
+  const title = document.createElement("span");
+  title.className = "titlebar-title";
+  title.textContent = "NICO AI";
+  left.append(mark, title);
+
+  const controls = document.createElement("div");
+  controls.className = "titlebar-controls";
+  const minBtn = document.createElement("button");
+  minBtn.type = "button";
+  minBtn.className = "titlebar-btn";
+  minBtn.title = "Minimize";
+  minBtn.setAttribute("aria-label", "Minimize");
+  minBtn.appendChild(svgIcon(["M2 6h8"]));
+  minBtn.addEventListener("click", () => shell.window("min"));
+  const maxBtn = document.createElement("button");
+  maxBtn.type = "button";
+  maxBtn.className = "titlebar-btn";
+  maxBtn.title = "Maximize";
+  maxBtn.setAttribute("aria-label", "Maximize or restore");
+  const maxIcon = svgIcon(["M2 2h8v8H2z"]);
+  const restoreIcon = svgIcon(["M4 1h7v7M1 4v7h7"]);
+  maxBtn.appendChild(maxIcon);
+  maxBtn.addEventListener("click", () => shell.window("max"));
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "titlebar-btn titlebar-close";
+  closeBtn.title = "Close";
+  closeBtn.setAttribute("aria-label", "Close");
+  closeBtn.appendChild(svgIcon(["M2 2l8 8M10 2l-8 8"]));
+  closeBtn.addEventListener("click", () => shell.window("close"));
+  controls.append(minBtn, maxBtn, closeBtn);
+
+  bar.append(left, controls);
+  document.body.prepend(bar);
+
+  bar.addEventListener("dblclick", (event) => {
+    if (event.target.closest(".titlebar-btn")) return;
+    shell.window("max");
+  });
+
+  const syncState = (maximized) => {
+    document.body.classList.toggle("is-maximized", !!maximized);
+    maxBtn.replaceChildren(maximized ? restoreIcon : maxIcon);
+    maxBtn.title = maximized ? "Restore" : "Maximize";
+  };
+  if (typeof shell.onWindowState === "function") {
+    shell.onWindowState((state) => syncState(state && state.maximized));
+  }
+})();

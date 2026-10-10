@@ -128,11 +128,13 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 700,
-    backgroundColor: "#050816",
     title: "Nico",
     icon: windowIcon,
     autoHideMenuBar: true,
     show: false,
+    // Custom Nico chrome: no native frame, see the in-app title bar.
+    frame: false,
+    transparent: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -153,12 +155,31 @@ function createWindow() {
     mainWindow = null;
   });
 
+  mainWindow.on("maximize", () => {
+    mainWindow?.webContents.send("nico:window-state", { maximized: true });
+  });
+
+  mainWindow.on("unmaximize", () => {
+    mainWindow?.webContents.send("nico:window-state", { maximized: false });
+  });
+
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
   });
 
   loadNico(mainWindow);
 }
+
+// Custom title-bar controls (min / max-restore / close).
+ipcMain.handle("nico:window", (_event, action) => {
+  if (!mainWindow) return false;
+  if (action === "min") mainWindow.minimize();
+  else if (action === "max") {
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
+  } else if (action === "close") mainWindow.close();
+  return true;
+});
 
 // Vision mode: the web build uses getDisplayMedia, which Chromium does not
 // expose inside Electron. The renderer asks here for desktop sources instead.

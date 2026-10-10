@@ -13,4 +13,17 @@ contextBridge.exposeInMainWorld("nicoDesktop", {
       return null;
     }
   },
+  // Custom frameless title-bar controls.
+  window(action) {
+    try {
+      return ipcRenderer.invoke("nico:window", action);
+    } catch {
+      return Promise.resolve(false);
+    }
+  },
+  onWindowState(callback) {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("nico:window-state", listener);
+    return () => ipcRenderer.removeListener("nico:window-state", listener);
+  },
 });
