@@ -59,7 +59,8 @@ if DEVELOPER_ACCOUNT["email"]:
   ADMIN_EMAILS.add(DEVELOPER_ACCOUNT["email"])
 GEMINI_VISION_MODEL = (os.getenv("GEMINI_VISION_MODEL") or "gemini-3.1-flash-lite").strip()
 HF_TOKEN = (os.getenv("HF_TOKEN") or os.getenv("HF_KEY") or "").strip()
-HF_IMAGE_MODEL = (os.getenv("HF_IMAGE_MODEL") or "black-forest-labs/FLUX.1-schnell").strip()
+HF_IMAGE_MODEL = (os.getenv("HF_IMAGE_MODEL") or "black-forest-labs/FLUX.1-dev").strip()
+HF_SPACE = (os.getenv("HF_SPACE") or "black-forest-labs/FLUX.1-schnell").strip()
 configured_vision_models = [
   model.strip()
   for model in os.getenv("GROQ_VISION_MODELS", "").split(",")
@@ -1578,24 +1579,65 @@ async def render_image_gemini(prompt: str):
 async def render_image_hf(prompt: str):
   if not HF_TOKEN:
     raise RuntimeError("token missing")
-  payload = {"inputs": prompt}
-  headers = {
-    "Authorization": f"Bearer {HF_TOKEN}",
-    "Content-Type": "application/json",
-    "Accept": "image/*",
-  }
-  response = await asyncio.to_thread(
-    lambda: requests.post(
-      f"https://api-inference.huggingface.co/models/{HF_IMAGE_MODEL}",
-      headers=headers,
-      json=payload,
-      timeout=180,
+  try:
+    from huggingface_hub import InferenceClient
+  except ImportError:
+    raise RuntimeError("image library missing on server")
+  def _call():
+    client = InferenceClient(token=HF_TOKEN)
+    return client.text_to_image(prompt, model=HF_IMAGE_MODEL)
+  try:
+    image = await asyncio.to_thread(_call)
+  except Exception as error:
+    raise RuntimeError(_shorten_hf_error(error))
+  buf = io.BytesIO()
+  image.convert("RGB").save(buf, format="PNG")
+  return buf.getvalue()
+
+
+async def render_image_space(prompt: str):
+  """Free Gradio Space renderer (no key needed)."""
+  try:
+    from gradio_client import Client
+  except ImportError:
+    raise RuntimeError("image library missing on server")
+
+  def _call():
+    client = Client(HF_SPACE)
+    result, _seed = client.predict(
+      prompt=prompt,
+      seed=0,
+      randomize_seed=True,
+      width=768,
+      height=768,
+      num_inference_steps=4,
+      api_name="/infer",
     )
-  )
-  content_type = response.headers.get("Content-Type", "")
-  if response.status_code != 200 or not content_type.startswith("image/"):
-    raise RuntimeError(f"refused (HTTP {response.status_code})")
-  return response.content
+    path = result.get("path") if isinstance(result, dict) else result
+    if not path:
+      raise RuntimeError("Space returned no image")
+    with open(path, "rb") as handle:
+      return handle.read()
+
+  try:
+    return await asyncio.to_thread(_call)
+  except Exception as error:
+    raise RuntimeError(_shorten_hf_error(error))
+
+
+def _shorten_hf_error(error):
+  text = str(error)
+  if "401" in text or "403" in text or "unauthorized" in text.lower():
+    return "bad token or missing provider permission"
+  if "402" in text or "payment" in text.lower() or "credit" in text.lower():
+    return "no credits left"
+  if "429" in text:
+    return "throttled, try again in a bit"
+  if "404" in text or "410" in text:
+    return "model retired"
+  if "timed out" in text.lower() or "timeout" in text.lower():
+    return "provider timed out"
+  return text[:120]
 
 
 def shorten_image_error(error):
@@ -1627,9 +1669,15 @@ async def render_image(prompt: str):
     raise
   except Exception as error:
     errors.append(f"Hugging Face: {shorten_image_error(error)}")
+  try:
+    return await render_image_space(text), "space"
+  except HTTPException:
+    raise
+  except Exception as error:
+    errors.append(f"Space: {shorten_image_error(error)}")
   raise HTTPException(
     status_code=503,
-    detail="Image rendering unavailable (" + "; ".join(errors[:2]) + ")",
+    detail="Image rendering unavailable (" + "; ".join(errors[:3]) + ")",
   )
 
 

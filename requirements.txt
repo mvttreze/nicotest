@@ -12,3 +12,5 @@ reportlab
 pillow
 requests
 httpx
+huggingface_hub
+gradio_client
