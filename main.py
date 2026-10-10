@@ -1761,6 +1761,10 @@ def get_user_badges(user):
       pass
   if is_developer_identity(user):
     badges.add("admin")
+  elif ((getattr(user, "user_metadata", {}) or {}).get("role") or "").lower() == "developer":
+    # Mirror the frontend Developer check so role-based admin accounts
+    # get the same treatment (e.g. Nemotron-first routing).
+    badges.add("admin")
   return badges
 
 

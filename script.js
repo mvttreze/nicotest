@@ -2997,13 +2997,16 @@ function maybeResumeWake() {
 async function maybeHandleLocalCommand(raw) {
   const text = (raw || "").trim();
   if (!text) return false;
+  // Tolerate addressing Nico first ("hey nico, remind me…"). Non-commands
+  // still fall through with the original input untouched.
+  const cmd = text.replace(/^(hey nico|nico)[,:]?\s+/i, "");
   if (
-    /^(remind me|set an? (alarm|timer|reminder)|in \d+\s*\w+ remind me)\b/i.test(text)
+    /^(remind me|set an? (alarm|timer|reminder)|in \d+\s*\w+ remind me)\b/i.test(cmd)
   ) {
-    return await handleReminderSend(text);
+    return await handleReminderSend(cmd);
   }
-  if (/^cancel all reminders$/i.test(text)) {
-    appendMessage("user", text, []);
+  if (/^cancel all reminders$/i.test(cmd)) {
+    appendMessage("user", cmd, []);
     const n = readReminders().filter((r) => !r.done).length;
     writeReminders([]);
     reminderTimers.forEach((t) => clearTimeout(t));
@@ -3017,19 +3020,19 @@ async function maybeHandleLocalCommand(raw) {
     );
     return true;
   }
-  if (/^remember\s/i.test(text) && !/^remember to\b/i.test(text)) {
-    return await handleRememberCommand(text);
+  if (/^remember\s/i.test(cmd) && !/^remember to\b/i.test(cmd)) {
+    return await handleRememberCommand(cmd);
   }
   if (
     /^(what do you remember|list (your )?memories|show (your )?memories|my memories)\b/i.test(
-      text,
+      cmd,
     )
   ) {
-    return await handleRecallCommand(text);
+    return await handleRecallCommand(cmd);
   }
-  const cityM = text.match(/^(?:set(?: my)? city (?:to|as) |my city is )(.{2,60})$/i);
+  const cityM = cmd.match(/^(?:set(?: my)? city (?:to|as) |my city is )(.{2,60})$/i);
   if (cityM) {
-    appendMessage("user", text, []);
+    appendMessage("user", cmd, []);
     settings.briefCity = cityM[1].trim();
     saveSettings();
     appendMessage(
@@ -3039,21 +3042,21 @@ async function maybeHandleLocalCommand(raw) {
     );
     return true;
   }
-  if (/^(good morning|morning|briefing|daily briefing|morning briefing)!?\s*$/i.test(text)) {
+  if (/^(good morning|morning|briefing|daily briefing|morning briefing)!?\s*$/i.test(cmd)) {
     await runBriefing();
     return true;
   }
   let m;
   if (
-    (m = text.match(
+    (m = cmd.match(
       /^(?:please\s+)?(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
     )) ||
-    (m = text.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)(?: doc| document| file)?$/i))
+    (m = cmd.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)(?: doc| document| file)?$/i))
   ) {
     let fmt = (m[m.length - 1] || "").toLowerCase();
     if (fmt === "doc") fmt = "docx";
     if (fmt === "md") fmt = "markdown";
-    appendMessage("user", text, []);
+    appendMessage("user", cmd, []);
     if (fmt === "pdf") exportCurrentPdf(true);
     else if (fmt === "word" || fmt === "docx") await exportCurrentDocx(true);
     else if (fmt === "json") exportChatJson();
@@ -3061,18 +3064,19 @@ async function maybeHandleLocalCommand(raw) {
     return true;
   }
   if (
-    (m = text.match(
+    (m = cmd.match(
       /^(?:please\s+|can you\s+)?(?:generate|create|write|make)(?: me)? a (pdf|word|docx|doc|document|report)(?: document| file| doc)?(?: about| on| of| for)?(.*)$/i,
     ))
   ) {
     let kind = (m[1] || "").toLowerCase();
     if (kind === "doc" || kind === "word") kind = "docx";
     if (kind === "document" || kind === "report") kind = "pdf";
-    await handleGenerateDoc(kind, (m[2] || "").trim());
+    const topic = ((m[2] || "").trim().replace(/^(and|with)\s+/i, ""));
+    await handleGenerateDoc(kind, topic);
     return true;
   }
   if (
-    (m = text.match(
+    (m = cmd.match(
       /^(?:please\s+)?(?:draw|paint|sketch|generate an image of|create an image of|make an image of|picture of|imagine)\s*(.*)$/i,
     ))
   ) {
@@ -3177,22 +3181,29 @@ function hideThinking() {
   }
 }
 
+function docTitleFromTopic(topic) {
+  const quoted = String(topic || "").match(/"([^"]+)"/);
+  if (quoted && quoted[1].trim()) return quoted[1].trim().slice(0, 120);
+  return String(topic || "").slice(0, 120) || "Nico document";
+}
+
 async function handleGenerateDoc(kind, topic) {
   appendMessage("user", `Make a ${kind} about ${topic}`, []);
   if (!topic) {
     appendMessage("assistant", "Give me a topic first — e.g. `make a pdf about sourdough`.", []);
     return;
   }
+  const title = docTitleFromTopic(topic);
   showThinking();
   try {
     const res = await fetch(`${apiBaseUrl}/export/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, kind }),
+      body: JSON.stringify({ topic: `${topic} (title the document "${title}")`, kind }),
     });
     if (!res.ok) throw new Error("build failed");
     const ext = kind === "docx" ? "docx" : "pdf";
-    const safe = topic.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "nico";
+    const safe = title.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "nico";
     downloadBlob(await res.blob(), `${safe}.${ext}`);
     appendMessage("assistant", `Here's your ${ext.toUpperCase()} on **${topic}** — downloading now.`, []);
   } catch {
