@@ -58,7 +58,7 @@ ADMIN_EMAILS = {
 if DEVELOPER_ACCOUNT["email"]:
   ADMIN_EMAILS.add(DEVELOPER_ACCOUNT["email"])
 GEMINI_VISION_MODEL = (os.getenv("GEMINI_VISION_MODEL") or "gemini-3.1-flash-lite").strip()
-HF_TOKEN = (os.getenv("HF_TOKEN") or "").strip()
+HF_TOKEN = (os.getenv("HF_TOKEN") or os.getenv("HF_KEY") or "").strip()
 HF_IMAGE_MODEL = (os.getenv("HF_IMAGE_MODEL") or "black-forest-labs/FLUX.1-schnell").strip()
 configured_vision_models = [
   model.strip()
