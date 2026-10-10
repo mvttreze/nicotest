@@ -9,5 +9,6 @@ pydantic
 pypdf
 python-docx
 reportlab
+pillow
 requests
 httpx

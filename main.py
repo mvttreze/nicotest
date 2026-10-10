@@ -58,6 +58,8 @@ ADMIN_EMAILS = {
 if DEVELOPER_ACCOUNT["email"]:
   ADMIN_EMAILS.add(DEVELOPER_ACCOUNT["email"])
 GEMINI_VISION_MODEL = (os.getenv("GEMINI_VISION_MODEL") or "gemini-3.1-flash-lite").strip()
+HF_TOKEN = (os.getenv("HF_TOKEN") or "").strip()
+HF_IMAGE_MODEL = (os.getenv("HF_IMAGE_MODEL") or "black-forest-labs/FLUX.1-schnell").strip()
 configured_vision_models = [
   model.strip()
   for model in os.getenv("GROQ_VISION_MODELS", "").split(",")
@@ -86,6 +88,7 @@ def runtime_service_status():
     "groq": bool(GROQ_API_KEY),
     "gemini": bool(GEMINI_API_KEY),
     "zen": bool(OPENCODE_API_KEY and OPENCODE_MODELS),
+    "hf": bool(HF_TOKEN),
   }
 
 
@@ -1509,6 +1512,11 @@ def slug_filename(name, ext):
 
 
 def imagine_url(prompt, width=1024, height=1024, model="flux"):
+  """Legacy Pollinations URL builder.
+
+  Kept for reference/tests only: anonymous Pollinations requests now return
+  HTTP 402, so /imagine renders via Gemini/Hugging Face instead.
+  """
   import urllib.parse
 
   text = (prompt or "").strip()
@@ -1535,6 +1543,89 @@ def imagine_url(prompt, width=1024, height=1024, model="flux"):
     "height": height,
     "seed": seed,
   }
+
+
+def downscale_image_bytes(raw: bytes, max_dim=1024, quality=82):
+  from PIL import Image
+
+  image = Image.open(io.BytesIO(raw))
+  if getattr(image, "is_animated", False):
+    image.seek(0)
+  image = image.convert("RGB")
+  image.thumbnail((max_dim, max_dim), Image.LANCZOS)
+  buf = io.BytesIO()
+  image.save(buf, format="JPEG", quality=quality)
+  return buf.getvalue()
+
+
+async def render_image_gemini(prompt: str):
+  if not gemini_client:
+    raise RuntimeError("Gemini is not configured")
+  response = await asyncio.to_thread(
+    lambda: gemini_client.models.generate_content(
+      model="gemini-2.5-flash-image",
+      contents=prompt,
+      config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
+    )
+  )
+  for part in getattr(response, "parts", None) or []:
+    inline = getattr(part, "inline_data", None)
+    if inline and getattr(inline, "data", None):
+      return bytes(inline.data)
+  raise RuntimeError("Gemini returned no image")
+
+
+async def render_image_hf(prompt: str):
+  if not HF_TOKEN:
+    raise RuntimeError("Hugging Face token is not configured")
+  payload = {"inputs": prompt}
+  headers = {
+    "Authorization": f"Bearer {HF_TOKEN}",
+    "Content-Type": "application/json",
+    "Accept": "image/*",
+  }
+  response = await asyncio.to_thread(
+    lambda: requests.post(
+      f"https://api-inference.huggingface.co/models/{HF_IMAGE_MODEL}",
+      headers=headers,
+      json=payload,
+      timeout=180,
+    )
+  )
+  content_type = response.headers.get("Content-Type", "")
+  if response.status_code != 200 or not content_type.startswith("image/"):
+    raise RuntimeError(
+      f"Hugging Face refused the request ({response.status_code}): "
+      f"{response.text[:200]}"
+    )
+  return response.content
+
+
+async def render_image(prompt: str):
+  """Free image rendering: Gemini first, Hugging Face FLUX as fallback."""
+  text = (prompt or "").strip()
+  if len(text) < 3:
+    raise HTTPException(status_code=400, detail="Describe the image first")
+  if len(text) > 500:
+    text = text[:500]
+  errors = []
+  try:
+    return await render_image_gemini(text), "gemini"
+  except HTTPException:
+    raise
+  except Exception as error:
+    errors.append(f"Gemini: {error}")
+  try:
+    return await render_image_hf(text), "huggingface"
+  except HTTPException:
+    raise
+  except Exception as error:
+    errors.append(f"Hugging Face: {error}")
+  raise HTTPException(
+    status_code=503,
+    detail="Image rendering is unavailable right now. "
+    + " ".join(errors[:2]),
+  )
 
 
 async def write_doc_markdown(topic, kind):
@@ -1621,11 +1712,21 @@ def export_pdf(request: ExportDocRequest):
 
 
 @app.post("/imagine")
-def imagine(
+async def imagine(
     request: ImagineRequest,
     authorization: str | None = Header(default=None),
 ):
-  result = imagine_url(request.prompt, request.width, request.height, request.model)
+  prompt = (request.prompt or "").strip()
+  if len(prompt) < 3:
+    raise HTTPException(status_code=400, detail="Describe the image first")
+  raw, provider = await render_image(prompt)
+  try:
+    data_url = "data:image/jpeg;base64," + base64.b64encode(
+      downscale_image_bytes(raw)
+    ).decode("ascii")
+  except Exception:
+    data_url = "data:image/jpeg;base64," + base64.b64encode(raw).decode("ascii")
+  result = {"image_url": data_url, "prompt": prompt[:500], "provider": provider}
   try:
     user = get_current_user(authorization) if authorization else None
   except HTTPException:
@@ -1635,7 +1736,7 @@ def imagine(
     attachments = [{
       "name": "nico-image.jpg",
       "mime_type": "image/jpeg",
-      "data_url": result["image_url"],
+      "data_url": data_url,
     }]
     _save_generated_pair(
       user, request.conversation_id,
