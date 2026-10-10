@@ -19,7 +19,6 @@ from docx import Document
 from supabase import Client, create_client
 import httpx
 import requests
-import sentry_sdk
 
 load_dotenv()
 
@@ -61,7 +60,6 @@ if DEVELOPER_ACCOUNT["email"]:
 GEMINI_VISION_MODEL = (os.getenv("GEMINI_VISION_MODEL") or "gemini-3.1-flash-lite").strip()
 HF_TOKEN = (os.getenv("HF_TOKEN") or "").strip()
 HF_IMAGE_MODEL = (os.getenv("HF_IMAGE_MODEL") or "black-forest-labs/FLUX.1-schnell").strip()
-SENTRY_DSN = (os.getenv("SENTRY_DSN") or "").strip()
 configured_vision_models = [
   model.strip()
   for model in os.getenv("GROQ_VISION_MODELS", "").split(",")
@@ -91,17 +89,7 @@ def runtime_service_status():
     "gemini": bool(GEMINI_API_KEY),
     "zen": bool(OPENCODE_API_KEY and OPENCODE_MODELS),
     "hf": bool(HF_TOKEN),
-    "sentry": bool(SENTRY_DSN),
   }
-
-
-if SENTRY_DSN:
-  sentry_sdk.init(
-    dsn=SENTRY_DSN,
-    send_default_pii=False,
-    traces_sample_rate=0.0,
-    environment="render" if os.getenv("RENDER") or RENDER_SERVICE_URL else "local",
-  )
 
 
 app = FastAPI()
@@ -1589,7 +1577,7 @@ async def render_image_gemini(prompt: str):
 
 async def render_image_hf(prompt: str):
   if not HF_TOKEN:
-    raise RuntimeError("Hugging Face token is not configured")
+    raise RuntimeError("token missing")
   payload = {"inputs": prompt}
   headers = {
     "Authorization": f"Bearer {HF_TOKEN}",
@@ -1606,11 +1594,17 @@ async def render_image_hf(prompt: str):
   )
   content_type = response.headers.get("Content-Type", "")
   if response.status_code != 200 or not content_type.startswith("image/"):
-    raise RuntimeError(
-      f"Hugging Face refused the request ({response.status_code}): "
-      f"{response.text[:200]}"
-    )
+    raise RuntimeError(f"refused (HTTP {response.status_code})")
   return response.content
+
+
+def shorten_image_error(error):
+  text = str(error)
+  if "429" in text or "RESOURCE_EXHAUSTED" in text or "quota" in text.lower():
+    return "quota exhausted"
+  if "404" in text or "NOT_FOUND" in text:
+    return "model retired"
+  return text[:120]
 
 
 async def render_image(prompt: str):
@@ -1626,17 +1620,16 @@ async def render_image(prompt: str):
   except HTTPException:
     raise
   except Exception as error:
-    errors.append(f"Gemini: {error}")
+    errors.append(f"Gemini: {shorten_image_error(error)}")
   try:
     return await render_image_hf(text), "huggingface"
   except HTTPException:
     raise
   except Exception as error:
-    errors.append(f"Hugging Face: {error}")
+    errors.append(f"Hugging Face: {shorten_image_error(error)}")
   raise HTTPException(
     status_code=503,
-    detail="Image rendering is unavailable right now. "
-    + " ".join(errors[:2]),
+    detail="Image rendering unavailable (" + "; ".join(errors[:2]) + ")",
   )
 
 
@@ -2201,8 +2194,6 @@ async def chat_stream(
   if not is_guest:
     who = (getattr(user, "email", "") or "demo-user").split("@")[0]
     add_admin_log(f"Chat from {who}: {(request.message or '')[:60]}")
-    if SENTRY_DSN:
-      sentry_sdk.set_user({"id": str(getattr(user, "id", "?")), "username": who})
 
   if not is_guest:
     if is_local_demo_user(user):

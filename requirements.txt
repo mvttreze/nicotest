@@ -12,4 +12,3 @@ reportlab
 pillow
 requests
 httpx
-sentry-sdk[fastapi]
