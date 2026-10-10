@@ -1595,34 +1595,61 @@ async def render_image_hf(prompt: str):
   return buf.getvalue()
 
 
+def space_pool():
+  """Gradio Spaces tried in order. Override with HF_SPACES as
+  "space-id|endpoint;space-id|endpoint"."""
+  raw = (os.getenv("HF_SPACES") or "").strip()
+  if raw:
+    entries = []
+    for chunk in raw.split(";"):
+      parts = [part.strip() for part in chunk.split("|")]
+      if len(parts) >= 2 and parts[0]:
+        entries.append((parts[0], parts[1] or "/infer"))
+    if entries:
+      return entries
+  return [
+    (HF_SPACE, "/infer"),
+    ("ByteDance/SDXL-Lightning", "/generate_image"),
+  ]
+
+
 async def render_image_space(prompt: str):
-  """Free Gradio Space renderer (no key needed)."""
+  """Free Gradio Space renderer (no key needed). Tries each pooled Space."""
   try:
     from gradio_client import Client
   except ImportError:
     raise RuntimeError("image library missing on server")
 
-  def _call():
-    client = Client(HF_SPACE)
-    result, _seed = client.predict(
-      prompt=prompt,
-      seed=0,
-      randomize_seed=True,
-      width=768,
-      height=768,
-      num_inference_steps=4,
-      api_name="/infer",
-    )
-    path = result.get("path") if isinstance(result, dict) else result
+  def _call_entry(space_id, endpoint):
+    client = Client(space_id)
+    if endpoint == "/generate_image":
+      out = client.predict(prompt=prompt, ckpt="4-Step", api_name=endpoint)
+      path = out if isinstance(out, str) else (
+        out.get("path") if isinstance(out, dict) else None
+      )
+    else:
+      result, _seed = client.predict(
+        prompt=prompt,
+        seed=0,
+        randomize_seed=True,
+        width=768,
+        height=768,
+        num_inference_steps=4,
+        api_name=endpoint,
+      )
+      path = result.get("path") if isinstance(result, dict) else result
     if not path:
       raise RuntimeError("Space returned no image")
     with open(path, "rb") as handle:
       return handle.read()
 
-  try:
-    return await asyncio.to_thread(_call)
-  except Exception as error:
-    raise RuntimeError(_shorten_hf_error(error))
+  last_error = RuntimeError("no image Space configured")
+  for space_id, endpoint in space_pool():
+    try:
+      return await asyncio.to_thread(_call_entry, space_id, endpoint)
+    except Exception as error:
+      last_error = error
+  raise RuntimeError(_shorten_hf_error(last_error))
 
 
 def _shorten_hf_error(error):
