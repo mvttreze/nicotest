@@ -3538,7 +3538,10 @@ async function handleImagine(prompt, display) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, display: shown, conversation_id: currentConversationId }),
     });
-    if (!res.ok) throw new Error("render failed");
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.detail || "render failed");
+    }
     const data = await res.json();
     const imagineAttachments = [
       {
@@ -3562,8 +3565,11 @@ async function handleImagine(prompt, display) {
         imagineAttachments,
       );
     }
-  } catch {
-    appendMessage("assistant", "I couldn't render that image — try again in a bit.", []);
+  } catch (error) {
+    const reason = error?.message && error.message !== "render failed"
+      ? ` (${String(error.message).slice(0, 200)})`
+      : "";
+    appendMessage("assistant", `I couldn't render that image${reason} — try again in a bit.`, []);
   } finally {
     hideThinking();
   }
