@@ -1584,11 +1584,16 @@ class ImagineRequest(BaseModel):
   height: int = 1024
   model: str = "flux"
   conversation_id: str | None = None
+  display: str | None = None
 
 
 class GenerateDocRequest(BaseModel):
   topic: str = ""
   kind: str = "pdf"
+  conversation_id: str | None = None
+  display: str | None = None
+  conversation_id: str | None = None
+  display: str | None = None
 
 
 @app.post("/export/docx")
@@ -1632,37 +1637,19 @@ def imagine(
       "mime_type": "image/jpeg",
       "data_url": result["image_url"],
     }]
-    if is_local_demo_user(user):
-      user_id = str(user.id)
-      if request.conversation_id in DEMO_CONVERSATIONS.get(user_id, {}):
-        DEMO_MESSAGES.setdefault(user_id, {}).setdefault(
-          request.conversation_id, []
-        ).extend([
-          {"id": str(uuid.uuid4()), "role": "user", "content": request.prompt,
-           "conversation_id": request.conversation_id,
-           "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"},
-          {"id": str(uuid.uuid4()), "role": "assistant", "content": caption,
-           "conversation_id": request.conversation_id, "attachments": attachments,
-           "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"},
-        ])
-    elif supabase_client:
-      try:
-        get_owned_conversation(request.conversation_id, user.id)
-        supabase_client.table("messages").insert([
-          {"role": "user", "content": request.prompt,
-           "conversation_id": request.conversation_id},
-          {"role": "assistant", "content": caption,
-           "conversation_id": request.conversation_id, "attachments": attachments},
-        ]).execute()
-      except HTTPException:
-        pass
-      except Exception:
-        pass
+    _save_generated_pair(
+      user, request.conversation_id,
+      (request.display or "").strip() or result["prompt"],
+      caption, attachments, f"Nico image: {result['prompt'][:60]}",
+    )
   return result
 
 
 @app.post("/export/generate")
-async def export_generate(request: GenerateDocRequest):
+async def export_generate(
+    request: GenerateDocRequest,
+    authorization: str | None = Header(default=None),
+):
   topic = (request.topic or "").strip()
   if len(topic) < 3:
     raise HTTPException(status_code=400, detail="Give a topic first")
@@ -1671,17 +1658,100 @@ async def export_generate(request: GenerateDocRequest):
   title = topic[:120]
   if kind == "docx":
     data = build_docx(title, markdown_text)
-    return Response(
-      content=data,
-      media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      headers={"Content-Disposition": f'attachment; filename="{slug_filename(title, "docx")}"'},
+    mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  else:
+    data = build_pdf(title, markdown_text)
+    mime_type = "application/pdf"
+  try:
+    user = get_current_user(authorization) if authorization else None
+  except HTTPException:
+    user = None
+  if user and request.conversation_id:
+    filename = slug_filename(title, kind)
+    attachments = [{
+      "name": filename,
+      "mime_type": mime_type,
+      "data_url": f"data:{mime_type};base64,{base64.b64encode(data).decode('ascii')}",
+    }]
+    _save_generated_pair(
+      user, request.conversation_id,
+      (request.display or "").strip() or f"Generate a {kind} about {topic}",
+      f"Here's your {kind.upper()} on **{topic}**:",
+      attachments, f"Nico document: {title[:60]}",
     )
-  data = build_pdf(title, markdown_text)
   return Response(
     content=data,
-    media_type="application/pdf",
-    headers={"Content-Disposition": f'attachment; filename="{slug_filename(title, "pdf")}"'},
+    media_type=mime_type,
+    headers={"Content-Disposition": f'attachment; filename="{slug_filename(title, kind)}"'},
   )
+
+
+def _now_iso():
+  return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+
+def _ensure_convo_for_save(user, conversation_id, fallback_title):
+  """Make sure a conversation row exists (and belongs to the user) so
+  generated files/images persist as a real chat. Returns True when the
+  caller may save messages under it."""
+  if not conversation_id:
+    return False
+  if is_local_demo_user(user):
+    user_id = str(user.id)
+    DEMO_CONVERSATIONS.setdefault(user_id, {}).setdefault(
+      conversation_id,
+      {
+        "id": conversation_id,
+        "title": (fallback_title or "Untitled Chat")[:120],
+        "user_id": user_id,
+        "created_at": _now_iso(),
+      },
+    )
+    return True
+  if not supabase_client:
+    return False
+  try:
+    get_owned_conversation(conversation_id, user.id)
+    return True
+  except HTTPException:
+    pass
+  try:
+    supabase_client.table("conversations").insert({
+      "id": conversation_id,
+      "title": (fallback_title or "Untitled Chat")[:120],
+      "user_id": user.id,
+    }).execute()
+    return True
+  except Exception:
+    return False
+
+
+def _save_generated_pair(user, conversation_id, user_content, assistant_content,
+                         attachments, fallback_title):
+  """Persist a generated file/image exchange as a real conversation so it
+  shows in the sidebar and reloads later. Best-effort: never raises."""
+  try:
+    if not _ensure_convo_for_save(user, conversation_id, fallback_title):
+      return
+    stamp = _now_iso()
+    if is_local_demo_user(user):
+      user_id = str(user.id)
+      DEMO_MESSAGES.setdefault(user_id, {}).setdefault(conversation_id, []).extend([
+        {"id": str(uuid.uuid4()), "role": "user", "content": user_content,
+         "conversation_id": conversation_id, "created_at": stamp},
+        {"id": str(uuid.uuid4()), "role": "assistant", "content": assistant_content,
+         "conversation_id": conversation_id, "attachments": attachments,
+         "created_at": stamp},
+      ])
+    else:
+      supabase_client.table("messages").insert([
+        {"role": "user", "content": user_content,
+         "conversation_id": conversation_id},
+        {"role": "assistant", "content": assistant_content,
+         "conversation_id": conversation_id, "attachments": attachments},
+      ]).execute()
+  except Exception:
+    pass
 
 
 def get_user_memories(user):

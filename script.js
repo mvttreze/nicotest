@@ -1880,6 +1880,45 @@ function appendAttachmentImages(content, attachments = []) {
   return rendered;
 }
 
+function isFileAttachment(attachment) {
+  if (!attachment || !attachment.data_url) return false;
+  const mime = (attachment.mime_type || "").toLowerCase();
+  if (
+    mime === "application/pdf" ||
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "application/msword"
+  ) {
+    return true;
+  }
+  return /\.(pdf|docx?)$/i.test(attachment.name || "");
+}
+
+function appendFileAttachmentCards(content, attachments = []) {
+  (attachments || []).filter(isFileAttachment).forEach((attachment) => {
+    const card = document.createElement("div");
+    card.className = "file-card";
+    const icon = document.createElement("span");
+    icon.className = "file-card-icon";
+    icon.textContent = /\.pdf$/i.test(attachment.name || "") ? "📕" : "📄";
+    const meta = document.createElement("span");
+    meta.className = "file-card-meta";
+    const name = document.createElement("strong");
+    name.textContent = attachment.name || "Attached file";
+    const size = document.createElement("small");
+    size.textContent = "saved file · tap to download";
+    meta.append(name, size);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "file-card-download";
+    btn.textContent = "Download";
+    btn.addEventListener("click", () =>
+      downloadUrl(attachment.data_url, attachment.name || "file"),
+    );
+    card.append(icon, meta, btn);
+    content.appendChild(card);
+  });
+}
+
 function appendMessage(role, text, attachments = [], msgId = null) {
   // Update state for non-empty chats
   appLayout?.classList.remove("new-chat-mode");
@@ -1895,6 +1934,7 @@ function appendMessage(role, text, attachments = [], msgId = null) {
     msgDiv.querySelector(".avatar-tag").textContent = settings.avatar;
     attachCodeCopyButtons(msgDiv);
     appendAttachmentImages(msgDiv.querySelector(".content"), attachments);
+    appendFileAttachmentCards(msgDiv.querySelector(".content"), attachments);
   } else {
     const content = document.createElement("div");
     content.className = "content";
@@ -1918,10 +1958,32 @@ function appendMessage(role, text, attachments = [], msgId = null) {
       if (content.firstChild) content.firstChild.textContent = cleaned;
       footerText = cleaned;
     }
+    appendFileAttachmentCards(content, attachments);
     msgDiv.appendChild(content);
   }
 
   attachMessageFooter(msgDiv, role, footerText);
+
+  // Generated images live at http(s) URLs (uploads are data:/blob:):
+  // give them a download button here so history reloads keep it too.
+  const bar = msgDiv.querySelector(":scope > .msg-actions");
+  if (bar && !bar.querySelector(".msg-action-download")) {
+    const remote = Array.from(
+      msgDiv.querySelectorAll("img.message-image-preview"),
+    ).find((img) => /^https?:\/\//i.test(img.getAttribute("src") || ""));
+    if (remote) {
+      const dl = document.createElement("button");
+      dl.type = "button";
+      dl.className = "msg-action-btn msg-action-download";
+      dl.title = "Download image";
+      dl.setAttribute("aria-label", "Download image");
+      dl.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+      dl.addEventListener("click", () =>
+        downloadUrl(remote.getAttribute("src"), remote.alt || "nico-image.jpg"),
+      );
+      bar.insertBefore(dl, bar.querySelector(".msg-timestamp"));
+    }
+  }
 
   ensureTypingIndicator();
   const indicator = document.getElementById("typingIndicator");
@@ -3069,6 +3131,55 @@ async function maybeHandleLocalCommand(raw) {
     else exportChat();
     return true;
   }
+  // Follow-ups on the latest generated image/doc ("change it…").
+  // Must run before the generic generate/imagine branches below.
+  let fm = cmd.match(
+    /^(?:can you\s+)?(?:change|edit|update|modify|regenerate|redo|remake)(?: it| this| that| the image| the document| the file| the pdf)?(?: to| into)?\s*(.*)$/i,
+  );
+  let followKind = null;
+  if (!fm) {
+    const gm = cmd.match(/^(?:can you\s+)?generate (?:that|this|the) image into\s+(.+)$/i);
+    if (gm) {
+      fm = gm;
+      followKind = "image";
+    }
+  }
+  if (!fm) {
+    const mm = cmd.match(/^make (it|this|that) (.+)$/i);
+    if (mm) {
+      fm = [mm[0], mm[2]];
+      followKind = "image";
+    }
+  }
+  if (fm) {
+    const rest = (fm[fm.length - 1] || "").trim();
+    const ref = cmd.match(/\b(image|picture|photo|document|file|pdf|docx?|doc)\b/i);
+    const want = followKind
+      || (ref && /^(image|picture|photo)$/i.test(ref[1]) ? "image"
+        : ref && /^(document|file|pdf|docx?|doc)$/i.test(ref[1]) ? "doc"
+        : null);
+    const last = findLastGen(want);
+    if (last && rest) {
+      if (last.type === "image") {
+        await handleImagine(`${rest} (variation of: ${last.prompt})`, text);
+        return true;
+      }
+      await handleGenerateDoc(last.kind || "pdf", `${rest} (revising: ${last.topic})`, text);
+      return true;
+    }
+    if (last && !rest) {
+      appendMessage("user", text, []);
+      appendMessage(
+        "assistant",
+        last.type === "image"
+          ? "What should I change? (e.g. `change it to a single dog in a field of flowers`)"
+          : "What should I change? (e.g. `change it to be about cats`)",
+        [],
+      );
+      return true;
+    }
+    // No generated context: let the backend answer normally.
+  }
   if (
     (m = cmd.match(
       /^(?:please\s+|can you\s+)?(?:generate|create|write|make)(?: me)? a (pdf|word|docx|doc|document|report)(?: document| file| doc)?(?: about| on| of| for)?(.*)$/i,
@@ -3078,7 +3189,7 @@ async function maybeHandleLocalCommand(raw) {
     if (kind === "doc" || kind === "word") kind = "docx";
     if (kind === "document" || kind === "report") kind = "pdf";
     const topic = ((m[2] || "").trim().replace(/^(and|with)\s+/i, ""));
-    await handleGenerateDoc(kind, topic);
+    await handleGenerateDoc(kind, topic, text);
     return true;
   }
   if (
@@ -3086,7 +3197,7 @@ async function maybeHandleLocalCommand(raw) {
       /^(?:please\s+)?(?:(?:draw|paint|sketch)(?: me)?|(?:generate|create|make|give)(?: me)? an image of|(?:generate|create|make|give)(?: me)? a picture of|picture of|imagine)\s*(.*)$/i,
     ))
   ) {
-    await handleImagine((m[1] || "").trim());
+    await handleImagine((m[1] || "").trim(), text);
     return true;
   }
   return false;
@@ -3193,9 +3304,43 @@ function docTitleFromTopic(topic) {
   return String(topic || "").slice(0, 120) || "Nico document";
 }
 
-async function handleGenerateDoc(kind, topic) {
+function findLastGen(prefer) {
+  const msgs = Array.from(
+    chatBox.querySelectorAll(".message.assistant:not(.thinking-indicator)"),
+  );
+  const hits = [];
+  msgs.forEach((m) => {
+    const img = m.querySelector("img.message-image-preview");
+    if (img) {
+      const raw = m.dataset.raw || "";
+      const cap = (raw.match(/\*\*(.+?)\*\*/) || [])[1] || img.alt || "";
+      hits.push({ type: "image", prompt: cap.trim() });
+    }
+    const card = m.querySelector(".file-card");
+    if (card) {
+      const raw = m.dataset.raw || "";
+      const cap = (raw.match(/\*\*(.+?)\*\*/) || [])[1] || "";
+      const name =
+        card.querySelector(".file-card-meta strong")?.textContent || "";
+      hits.push({
+        type: "doc",
+        topic: cap.trim(),
+        filename: name,
+        kind: /\.pdf$/i.test(name) ? "pdf" : "docx",
+      });
+    }
+  });
+  if (!hits.length) return null;
+  if (prefer) {
+    return hits.filter((h) => h.type === prefer).pop() || null;
+  }
+  return hits[hits.length - 1];
+}
+
+async function handleGenerateDoc(kind, topic, display) {
   topic = String(topic || "").replace(/\([^)]*title[^)]*\)/gi, "").replace(/\s{2,}/g, " ").trim();
-  appendMessage("user", `Make a ${kind} about ${topic}`, []);
+  const shown = (display || `Make a ${kind} about ${topic}`).trim() || `Make a ${kind} file`;
+  appendMessage("user", shown, []);
   if (!topic) {
     appendMessage("assistant", "Give me a topic first — e.g. `make a pdf about sourdough`.", []);
     return;
@@ -3203,15 +3348,46 @@ async function handleGenerateDoc(kind, topic) {
   const title = docTitleFromTopic(topic);
   showThinking();
   try {
-    const res = await fetch(`${apiBaseUrl}/export/generate`, {
+    const res = await apiFetch(`${apiBaseUrl}/export/generate`, {
+      allowGuest: true,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: `${topic} (title the document "${title}")`, kind }),
+      body: JSON.stringify({
+        topic: `${topic} (title the document "${title}")`,
+        kind,
+        display: shown,
+        conversation_id: currentConversationId,
+      }),
     });
     if (!res.ok) throw new Error("build failed");
     const ext = kind === "docx" ? "docx" : "pdf";
     const safe = title.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "nico";
-    appendFileCard(`Here's your ${ext.toUpperCase()} on **${topic}**:`, await res.blob(), `${safe}.${ext}`);
+    const blob = await res.blob();
+    const dataUrl = await readFileAsDataUrl(blob);
+    const filename = `${safe}.${ext}`;
+    appendFileCard(
+      `Here's your ${ext.toUpperCase()} on **${topic}**:`,
+      dataUrl,
+      filename,
+      `${(blob.size / 1024).toFixed(0)} KB · saved in this chat, tap to download`,
+    );
+    if (currentUser && !authClient) {
+      upsertLocalConversation({
+        id: currentConversationId,
+        title: "Untitled Chat",
+        user_id: currentUser.id,
+      });
+      appendLocalConversationMessage(currentConversationId, "user", shown);
+      appendLocalConversationMessage(currentConversationId, "assistant", `Here's your ${ext.toUpperCase()} on **${topic}**:`, [
+        {
+          name: filename,
+          mime_type: ext === "docx"
+            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            : "application/pdf",
+          data_url: dataUrl,
+        },
+      ]);
+    }
   } catch {
     appendMessage("assistant", "I couldn't build that file — try again.", []);
   } finally {
@@ -3219,8 +3395,7 @@ async function handleGenerateDoc(kind, topic) {
   }
 }
 
-function appendFileCard(captionMarkdown, blob, filename) {
-  const url = URL.createObjectURL(blob);
+function appendFileCard(captionMarkdown, url, filename, sizeText) {
   const host = document.createElement("div");
   host.className = "message assistant";
   const content = document.createElement("div");
@@ -3236,14 +3411,14 @@ function appendFileCard(captionMarkdown, blob, filename) {
   const name = document.createElement("strong");
   name.textContent = filename;
   const size = document.createElement("small");
-  size.textContent = `${(blob.size / 1024).toFixed(0)} KB · saved in this chat, tap to download`;
+  size.textContent = sizeText || "tap to download";
   meta.append(name, size);
-  const link = document.createElement("a");
-  link.className = "file-card-download";
-  link.href = url;
-  link.download = filename;
-  link.textContent = "Download";
-  card.append(icon, meta, link);
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "file-card-download";
+  btn.textContent = "Download";
+  btn.addEventListener("click", () => downloadUrl(url, filename));
+  card.append(icon, meta, btn);
   content.appendChild(card);
   host.appendChild(content);
   attachCodeCopyButtons(host);
@@ -3264,8 +3439,9 @@ async function downloadUrl(url, filename) {
   }
 }
 
-async function handleImagine(prompt) {
-  appendMessage("user", prompt, []);
+async function handleImagine(prompt, display) {
+  const shown = (display || prompt || "").trim() || prompt;
+  appendMessage("user", shown, []);
   if (!prompt) {
     appendMessage("assistant", "Describe the image first — e.g. `draw a robot at sunset`.", []);
     return;
@@ -3276,7 +3452,7 @@ async function handleImagine(prompt) {
       allowGuest: true,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, conversation_id: currentConversationId }),
+      body: JSON.stringify({ prompt, display: shown, conversation_id: currentConversationId }),
     });
     if (!res.ok) throw new Error("render failed");
     const data = await res.json();
@@ -3288,26 +3464,13 @@ async function handleImagine(prompt) {
       },
     ];
     appendMessage("assistant", `**${data.prompt || prompt}**`, imagineAttachments);
-    const bubbles = chatBox.querySelectorAll(".message.assistant:not(.thinking-indicator)");
-    const lastBubble = bubbles[bubbles.length - 1];
-    const bar = lastBubble?.querySelector(":scope > .msg-actions");
-    if (bar) {
-      const dl = document.createElement("button");
-      dl.type = "button";
-      dl.className = "msg-action-btn";
-      dl.title = "Download image";
-      dl.setAttribute("aria-label", "Download image");
-      dl.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
-      dl.addEventListener("click", () => downloadUrl(data.image_url, "nico-image.jpg"));
-      bar.insertBefore(dl, bar.querySelector(".msg-timestamp"));
-    }
     if (currentUser && !authClient) {
       upsertLocalConversation({
         id: currentConversationId,
         title: "Untitled Chat",
         user_id: currentUser.id,
       });
-      appendLocalConversationMessage(currentConversationId, "user", prompt);
+      appendLocalConversationMessage(currentConversationId, "user", shown);
       appendLocalConversationMessage(
         currentConversationId,
         "assistant",
