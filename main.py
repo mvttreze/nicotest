@@ -81,6 +81,18 @@ OPENCODE_MODELS = [
   for model in os.getenv("OPENCODE_MODELS", "nemotron-3-ultra-free,exo-free").split(",")
   if model.strip()
 ]
+# FreeLLMAPI gateway (local-first OpenAI-compatible router). Set both to
+# enable: base URL has no /v1 suffix, e.g. http://localhost:3001. On Render
+# this only works with a publicly reachable gateway; localhost means local
+# backend runs only.
+FREELLMAPI_BASE_URL = (os.getenv("FREELLMAPI_BASE_URL") or "").strip().rstrip("/")
+FREELLMAPI_API_KEY = (os.getenv("FREELLMAPI_API_KEY") or "").strip()
+FREELLMAPI_CHAT_MODEL = (os.getenv("FREELLMAPI_CHAT_MODEL") or "auto").strip()
+FREELLMAPI_IMAGE_MODEL = (os.getenv("FREELLMAPI_IMAGE_MODEL") or "auto").strip()
+
+
+def freellmapi_enabled():
+  return bool(FREELLMAPI_BASE_URL and FREELLMAPI_API_KEY)
 
 
 def runtime_service_status():
@@ -90,6 +102,7 @@ def runtime_service_status():
     "gemini": bool(GEMINI_API_KEY),
     "zen": bool(OPENCODE_API_KEY and OPENCODE_MODELS),
     "hf": bool(HF_TOKEN),
+    "freellmapi": bool(FREELLMAPI_BASE_URL and FREELLMAPI_API_KEY),
   }
 
 
@@ -1018,6 +1031,79 @@ async def zen_chat_once(model: str, messages: list, max_tokens: int = 60):
     return (((obj.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
 
 
+def freellmapi_headers():
+  return {
+    "Authorization": f"Bearer {FREELLMAPI_API_KEY}",
+    "Content-Type": "application/json",
+    "X-Title": "Nico AI",
+  }
+
+
+async def freellmapi_chat_stream(messages: list):
+  payload = {"model": FREELLMAPI_CHAT_MODEL, "messages": messages, "stream": True}
+  async with httpx.AsyncClient(timeout=httpx.Timeout(90.0)) as client:
+    async with client.stream(
+      "POST",
+      f"{FREELLMAPI_BASE_URL}/v1/chat/completions",
+      headers=freellmapi_headers(),
+      json=payload,
+    ) as response:
+      if response.status_code in (401, 402, 403, 429):
+        body = (await response.aread()).decode("utf-8", "replace")[:300]
+        raise RuntimeError(f"Gateway refused the request ({response.status_code}): {body}")
+      response.raise_for_status()
+      # Same OpenAI SSE shape as Zen.
+      async for line in response.aiter_lines():
+        content = parse_zen_sse_line(line)
+        if content:
+          yield content
+
+
+async def freellmapi_chat_once(messages: list, max_tokens: int = 60):
+  payload = {
+    "model": FREELLMAPI_CHAT_MODEL,
+    "messages": messages,
+    "stream": False,
+    "max_tokens": max_tokens,
+  }
+  async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+    response = await client.post(
+      f"{FREELLMAPI_BASE_URL}/v1/chat/completions",
+      headers=freellmapi_headers(),
+      json=payload,
+    )
+    response.raise_for_status()
+    obj = response.json()
+    return (((obj.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
+
+
+async def render_image_gateway(prompt: str):
+  """Image rendering via the FreeLLMAPI gateway (/v1/images/generations)."""
+  payload = {
+    "model": FREELLMAPI_IMAGE_MODEL,
+    "prompt": prompt,
+    "size": "1024x1024",
+    "response_format": "b64_json",
+  }
+  async with httpx.AsyncClient(timeout=httpx.Timeout(150.0)) as client:
+    response = await client.post(
+      f"{FREELLMAPI_BASE_URL}/v1/images/generations",
+      headers=freellmapi_headers(),
+      json=payload,
+    )
+    response.raise_for_status()
+    data = (response.json().get("data") or [{}])[0]
+    b64 = data.get("b64_json")
+    if b64:
+      return base64.b64decode(b64)
+    url = data.get("url")
+    if not url:
+      raise RuntimeError("gateway returned no image data")
+    img = await client.get(url)
+    img.raise_for_status()
+    return img.content
+
+
 async def generate_title(text: str, use_zen: bool = False):
   prompt = (
     "Summarize this query into a 3 to 5 word title. Do not use quotes or"
@@ -1038,11 +1124,18 @@ async def generate_title(text: str, use_zen: bool = False):
     )
     return (title_res.choices[0].message.content or "").strip() or "Untitled Chat"
 
+  async def via_freellmapi():
+    return (
+      await freellmapi_chat_once([{"role": "user", "content": prompt}])
+    ).strip() or "Untitled Chat"
+
   attempts = []
   if use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
     attempts.append(via_zen)
   if groq_client:
     attempts.append(via_groq)
+  if freellmapi_enabled():
+    attempts.append(via_freellmapi)
   for attempt in attempts:
     try:
       return await attempt()
@@ -1677,13 +1770,20 @@ def shorten_image_error(error):
 
 
 async def render_image(prompt: str):
-  """Free image rendering: Gemini first, Hugging Face FLUX as fallback."""
+  """Free image rendering: gateway first, then Gemini, Hugging Face, Space."""
   text = (prompt or "").strip()
   if len(text) < 3:
     raise HTTPException(status_code=400, detail="Describe the image first")
   if len(text) > 500:
     text = text[:500]
   errors = []
+  if freellmapi_enabled():
+    try:
+      return await render_image_gateway(text), "gateway"
+    except HTTPException:
+      raise
+    except Exception as error:
+      errors.append(f"Gateway: {shorten_image_error(error)}")
   try:
     return await render_image_gemini(text), "gemini"
   except HTTPException:
@@ -2496,6 +2596,9 @@ async def chat_stream(
             if request.settings.get("model") == "light"
             else "openai/gpt-oss-120b",
           ))
+        if freellmapi_enabled():
+          # Gateway last: aggregates free tiers, only tried when direct legs fail.
+          models_to_try.append(("freellmapi", FREELLMAPI_CHAT_MODEL))
       last_error = None
 
       for provider, model in models_to_try:
@@ -2509,6 +2612,12 @@ async def chat_stream(
 
             async for chunk in response_stream:
               content = chunk.choices[0].delta.content or ""
+              if content:
+                content = format_response(content)
+                full_reply += content
+                yield content
+          elif provider == "freellmapi":
+            async for content in freellmapi_chat_stream(messages_payload):
               if content:
                 content = format_response(content)
                 full_reply += content
