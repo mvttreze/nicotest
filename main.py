@@ -6,6 +6,7 @@ import os
 import re
 import uuid
 from datetime import datetime
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -139,6 +140,20 @@ MAINTENANCE: dict = {"enabled": False}
 class AuthRequest(BaseModel):
   username_or_email: str
   password: str
+  redirect_url: str = ""
+
+
+def sanitize_redirect_url(value: str):
+  """Allowlist http(s) origins for Supabase email redirects (no open redirect)."""
+  candidate = (value or "").strip()[:200]
+  if not candidate:
+    return ""
+  parsed = urlparse(candidate)
+  if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+    return ""
+  if parsed.username or parsed.password:
+    return ""
+  return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def normalize_demo_identifier(value: str):
@@ -230,10 +245,16 @@ def auth_signup(request: AuthRequest):
 
   if supabase_client:
     try:
+      signup_options = {"data": {"full_name": safe_name, "name": safe_name}}
+      # Keep email-confirmation links on the origin the user signed up from
+      # (localhost stays localhost instead of bouncing to production).
+      redirect_origin = sanitize_redirect_url(request.redirect_url)
+      if redirect_origin:
+        signup_options["email_redirect_to"] = redirect_origin
       response = supabase_client.auth.sign_up({
         "email": email,
         "password": password,
-        "options": {"data": {"full_name": safe_name, "name": safe_name}},
+        "options": signup_options,
       })
       user = response.user
       session = response.session

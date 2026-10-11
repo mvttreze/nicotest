@@ -4331,7 +4331,11 @@ async function submitDemoAuth(action = "login", username, password) {
   const response = await fetch(`${apiBaseUrl}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username_or_email: username, password }),
+    body: JSON.stringify({
+      username_or_email: username,
+      password,
+      redirect_url: window.location.origin,
+    }),
   });
 
   const payload = await response.json().catch(() => ({}));
