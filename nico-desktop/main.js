@@ -1,5 +1,7 @@
 const { app, BrowserWindow, Menu, Tray, globalShortcut, nativeImage, ipcMain, desktopCapturer } = require("electron");
 const path = require("path");
+const fs = require("fs");
+const { spawn } = require("child_process");
 
 const DEFAULT_URL = "https://nico-ai-assistant.onrender.com";
 const localIndex = path.resolve(__dirname, "..", "index.html");
@@ -180,6 +182,123 @@ ipcMain.handle("nico:window", (_event, action) => {
     else mainWindow.maximize();
   } else if (action === "close") mainWindow.close();
   return true;
+});
+
+// CLI hands: run an allowlisted coding agent headless and return its output.
+// The renderer invokes this for "/cli <task>" messages (desktop app only).
+// Tasks run inside ~/nico-workspace so generated files land predictably.
+const CLI_TOOLS = {
+  claude: (task) => ["-p", task, "--dangerously-skip-permissions"],
+  opencode: (task) => ["run", task],
+  codex: (task) => ["exec", task],
+};
+const CLI_TIMEOUT_MS = 180000;
+const CLI_MAX_OUTPUT = 6000;
+
+function nicoWorkspaceDir() {
+  const dir = path.join(app.getPath("documents"), "nico-workspace");
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {}
+  return dir;
+}
+
+// Batch-file quoting for .cmd/.bat shims: cmd.exe and the batch layer parse
+// the line before node ever sees it, so MSVCRT backslash escapes would
+// arrive literally. Doubled quotes survive both layers; doubled percents
+// survive batch %-expansion. Everything else is literal inside quotes.
+function batchQuote(arg) {
+  return `"${String(arg).replace(/%/g, "%%").replace(/"/g, '""')}"`;
+}
+
+// Resolve a CLI tool against PATH without a shell, preferring real
+// executables over .cmd/.bat shims (shims take the cmd.exe path below).
+function resolveBin(tool) {
+  const names = process.platform === "win32"
+    ? [`${tool}.exe`, tool, `${tool}.cmd`, `${tool}.bat`]
+    : [tool];
+  const dirs = String(process.env.PATH || "").split(path.delimiter);
+  for (const rawDir of dirs) {
+    const dir = rawDir.trim();
+    if (!dir) continue;
+    for (const name of names) {
+      const full = path.join(dir, name);
+      try {
+        fs.accessSync(full);
+        return full;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+ipcMain.handle("nico:run-cli", async (_event, request) => {
+  const tool = String(request?.tool || "claude").toLowerCase();
+  const task = String(request?.task || "").trim();
+  if (!CLI_TOOLS[tool]) return { ok: false, error: `Unknown CLI tool: ${tool}` };
+  if (task.length < 3) return { ok: false, error: "Describe the task first" };
+  if (task.length > 4000) return { ok: false, error: "Task too long (4000 chars max)" };
+  const cwd = nicoWorkspaceDir();
+  const resolved = resolveBin(tool);
+  if (!resolved) {
+    return { ok: false, error: `CLI '${tool}' not found — install it and retry` };
+  }
+  // .cmd/.bat shims ride one pre-quoted command string through the shell;
+  // real binaries spawn directly with shell:false. Either way the task text
+  // stays inside batchQuote() and can never break out into extra commands.
+  const isBatch = /\.(cmd|bat)$/i.test(resolved);
+  const parts = [resolved, ...CLI_TOOLS[tool](task)];
+  const useShell = isBatch;
+  const file = useShell ? parts.map(batchQuote).join(" ") : resolved;
+  const args = useShell ? [] : CLI_TOOLS[tool](task);
+  return await new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(file, args, {
+        cwd,
+        timeout: CLI_TIMEOUT_MS,
+        windowsHide: true,
+        shell: useShell,
+      });
+    } catch (error) {
+      resolve({ ok: false, error: `Could not start ${tool}: ${error.message}` });
+      return;
+    }
+    let out = "";
+    let err = "";
+    child.stdout?.on("data", (data) => { out += data.toString(); });
+    child.stderr?.on("data", (data) => { err += data.toString(); });
+    child.on("error", () => resolve({
+      ok: false,
+      error: `CLI '${tool}' not found — install it and retry`,
+    }));
+    child.on("close", (code, signal) => {
+      if (signal === "SIGTERM" && !out.trim()) {
+        resolve({ ok: false, error: "CLI run timed out after 180s" });
+        return;
+      }
+      if (/is not recognized as an internal/i.test(err)) {
+        resolve({ ok: false, error: `CLI '${tool}' not found — install it and retry` });
+        return;
+      }
+      const output = (out + (err ? `\n[stderr]\n${err}` : "")).trim();
+      if ((code === 0 || signal === "SIGTERM") && output) {
+        const truncated = output.length > CLI_MAX_OUTPUT;
+        resolve({
+          ok: true,
+          tool,
+          output: truncated ? output.slice(0, CLI_MAX_OUTPUT) : output,
+          truncated,
+          cwd,
+        });
+      } else {
+        resolve({
+          ok: false,
+          error: (err || out || `exit code ${code}`).trim().slice(0, 500),
+        });
+      }
+    });
+  });
 });
 
 // Vision mode: the web build uses getDisplayMedia, which Chromium does not

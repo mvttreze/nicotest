@@ -3137,12 +3137,54 @@ function matchDocIntent(raw) {
   return { ask: true };
 }
 
+/* ---------- CLI hands: run claude / opencode / codex via the desktop shell ---------- */
+async function handleCliCommand(task, tool, raw) {
+  appendMessage("user", raw, []);
+  const shell = window.nicoDesktop;
+  if (!shell || typeof shell.runCli !== "function") {
+    appendMessage(
+      "assistant",
+      "CLI hands need the Nico desktop app — `/cli` doesn't run in the browser. Open Nico Desktop and try again.",
+      [],
+    );
+    return true;
+  }
+  appendMessage(
+    "assistant",
+    `_Running that with \`${tool}\` in \`nico-workspace\` — this can take a minute…_`,
+    [],
+  );
+  let result;
+  try {
+    result = await shell.runCli(task, tool);
+  } catch (error) {
+    appendMessage("assistant", `CLI run failed: ${(error && error.message) || error}`, []);
+    return true;
+  }
+  if (result && result.ok) {
+    const safe = String(result.output || "(no output)").replace(/```/g, "'''");
+    appendMessage(
+      "assistant",
+      `**${tool} finished** — files land in Documents/nico-workspace:\n\`\`\`\n${safe}\n\`\`\``,
+      [],
+    );
+  } else {
+    appendMessage("assistant", `CLI run failed: ${(result && result.error) || "unknown error"}`, []);
+  }
+  return true;
+}
+
 async function maybeHandleLocalCommand(raw) {
   const text = (raw || "").trim();
   if (!text) return false;
   // Tolerate addressing Nico first ("hey nico, remind me…"). Non-commands
   // still fall through with the original input untouched.
   const cmd = text.replace(/^(hey nico|nico)[,:]?\s+/i, "");
+  // CLI hands (desktop app only): "/cli <task>" or "/cli <tool> <task>".
+  const cliM = cmd.match(/^\/cli(?:\s+(claude|opencode|codex))?\s+([\s\S]{3,4000})$/i);
+  if (cliM) {
+    return await handleCliCommand(cliM[2].trim(), (cliM[1] || "claude").toLowerCase(), text);
+  }
   if (
     /^(remind me|set an? (alarm|timer|reminder)|in \d+\s*\w+ remind me)\b/i.test(cmd)
   ) {

@@ -13,6 +13,14 @@ contextBridge.exposeInMainWorld("nicoDesktop", {
       return null;
     }
   },
+  // CLI hands: run claude / opencode / codex headless in ~/nico-workspace.
+  async runCli(task, tool = "claude") {
+    try {
+      return await ipcRenderer.invoke("nico:run-cli", { task, tool });
+    } catch (error) {
+      return { ok: false, error: String((error && error.message) || error) };
+    }
+  },
   // Custom frameless title-bar controls.
   window(action) {
     try {
