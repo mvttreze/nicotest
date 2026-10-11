@@ -1104,7 +1104,7 @@ async def render_image_gateway(prompt: str):
     return img.content
 
 
-async def generate_title(text: str, use_zen: bool = False):
+async def generate_title(text: str, use_zen: bool = False, use_gateway: bool = False):
   prompt = (
     "Summarize this query into a 3 to 5 word title. Do not use quotes or"
     f" punctuation: '{text}'"
@@ -1134,7 +1134,7 @@ async def generate_title(text: str, use_zen: bool = False):
     attempts.append(via_zen)
   if groq_client:
     attempts.append(via_groq)
-  if freellmapi_enabled():
+  if use_gateway and freellmapi_enabled():
     attempts.append(via_freellmapi)
   for attempt in attempts:
     try:
@@ -1769,15 +1769,15 @@ def shorten_image_error(error):
   return text[:120]
 
 
-async def render_image(prompt: str):
-  """Free image rendering: gateway first, then Gemini, Hugging Face, Space."""
+async def render_image(prompt: str, use_gateway: bool = False):
+  """Free image rendering: gateway (badged) first, then Gemini, HF, Space."""
   text = (prompt or "").strip()
   if len(text) < 3:
     raise HTTPException(status_code=400, detail="Describe the image first")
   if len(text) > 500:
     text = text[:500]
   errors = []
-  if freellmapi_enabled():
+  if use_gateway and freellmapi_enabled():
     try:
       return await render_image_gateway(text), "gateway"
     except HTTPException:
@@ -1899,7 +1899,13 @@ async def imagine(
   prompt = (request.prompt or "").strip()
   if len(prompt) < 3:
     raise HTTPException(status_code=400, detail="Describe the image first")
-  raw, provider = await render_image(prompt)
+  try:
+    img_user = get_current_user(authorization) if authorization else None
+  except HTTPException:
+    img_user = None
+  # Gateway images are tester-gated: any badge (tester/supporter/admin).
+  gateway_badges = get_user_badges(img_user) if img_user else set()
+  raw, provider = await render_image(prompt, use_gateway=bool(gateway_badges))
   try:
     data_url = "data:image/jpeg;base64," + base64.b64encode(
       downscale_image_bytes(raw)
@@ -1907,10 +1913,7 @@ async def imagine(
   except Exception:
     data_url = "data:image/jpeg;base64," + base64.b64encode(raw).decode("ascii")
   result = {"image_url": data_url, "prompt": prompt[:500], "provider": provider}
-  try:
-    user = get_current_user(authorization) if authorization else None
-  except HTTPException:
-    user = None
+  user = img_user
   if user and request.conversation_id:
     caption = f"**{result['prompt']}**"
     attachments = [{
@@ -2358,8 +2361,11 @@ async def chat_stream(
   user = get_current_user(authorization) if authorization else None
   is_guest = user is None
   is_admin_user = is_developer_identity(user) if user else False
-  # Zen fallback is reserved for badged accounts (admins included).
-  can_use_zen = bool(user) and bool(get_user_badges(user))
+  # Tester role is scoped to gateway + CLI: tester unlocks the FreeLLMAPI
+  # legs only. Zen stays with supporters and admins (tester excluded).
+  user_badge_set = get_user_badges(user) if user else set()
+  can_use_zen = bool(user) and bool(user_badge_set - {"tester"})
+  can_use_gateway = bool(user) and bool(user_badge_set)
 
   if MAINTENANCE["enabled"] and not is_admin_user:
     async def _maintenance_reply():
@@ -2376,7 +2382,7 @@ async def chat_stream(
       user_conversations = DEMO_CONVERSATIONS.setdefault(user_id, {})
       user_messages = DEMO_MESSAGES.setdefault(user_id, {})
       if request.conversation_id not in user_conversations:
-        generated_title = await generate_title(request.message, can_use_zen)
+        generated_title = await generate_title(request.message, can_use_zen, can_use_gateway)
         user_conversations[request.conversation_id] = {
             "id": request.conversation_id,
             "title": generated_title,
@@ -2403,7 +2409,7 @@ async def chat_stream(
       )
 
       if not conv_check.data:
-        generated_title = await generate_title(request.message, can_use_zen)
+        generated_title = await generate_title(request.message, can_use_zen, can_use_gateway)
 
         supabase_client.table("conversations").insert({
             "id": request.conversation_id,
@@ -2596,7 +2602,7 @@ async def chat_stream(
             if request.settings.get("model") == "light"
             else "openai/gpt-oss-120b",
           ))
-        if freellmapi_enabled():
+        if can_use_gateway and freellmapi_enabled():
           # Gateway last: aggregates free tiers, only tried when direct legs fail.
           models_to_try.append(("freellmapi", FREELLMAPI_CHAT_MODEL))
       last_error = None

@@ -3149,6 +3149,15 @@ async function handleCliCommand(task, tool, raw) {
     );
     return true;
   }
+  // Tester-gated: any badge (tester/supporter/admin) may run local CLIs.
+  if (!myBadges.length) {
+    appendMessage(
+      "assistant",
+      "CLI hands are tester-gated — sign in with a badged account (ask Matt for a tester badge) and try again.",
+      [],
+    );
+    return true;
+  }
   appendMessage(
     "assistant",
     `_Running that with \`${tool}\` in \`nico-workspace\` — this can take a minute…_`,
@@ -4196,6 +4205,7 @@ function setDeveloperDashboardVisibility(user) {
 }
 
 let myBadgeLoadToken = 0;
+let myBadges = [];
 async function loadMyBadges() {
   const wrap = document.getElementById("identityBadges");
   if (!wrap) return;
@@ -4207,6 +4217,7 @@ async function loadMyBadges() {
       if (res.ok) badges = (await res.json()).badges || [];
     } catch {}
   }
+  myBadges = badges || [];
   // A newer load started while we awaited: drop this stale result instead
   // of painting a duplicate set of chips.
   if (token !== myBadgeLoadToken) return;
