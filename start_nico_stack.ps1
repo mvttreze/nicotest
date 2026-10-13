@@ -8,7 +8,8 @@
 #   .\start_nico_stack.ps1 -NoDirectKeys   # blank GROQ/OPENCODE keys (gateway A/B test)
 param(
   [switch]$Desktop,
-  [switch]$NoDirectKeys
+  [switch]$NoDirectKeys,
+  [switch]$NoBrowser
 )
 
 $ErrorActionPreference = "Stop"
@@ -83,4 +84,6 @@ if ($Desktop) {
 
 Write-Host ""
 Write-Host "Stack ready: open http://localhost:5500" -ForegroundColor Green
-Start-Process "http://localhost:5500"
+if (-not $NoBrowser) {
+  Start-Process "http://localhost:5500"
+}
