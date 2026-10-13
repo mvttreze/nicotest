@@ -213,11 +213,23 @@ function batchQuote(arg) {
 
 // Resolve a CLI tool against PATH without a shell, preferring real
 // executables over .cmd/.bat shims (shims take the cmd.exe path below).
+// Electron's PATH often lacks the user's npm global dir (e.g. when started
+// from a shortcut), so well-known install locations are searched too.
 function resolveBin(tool) {
   const names = process.platform === "win32"
-    ? [`${tool}.exe`, tool, `${tool}.cmd`, `${tool}.bat`]
+    ? [`${tool}.exe`, `${tool}.cmd`, `${tool}.bat`, tool]
     : [tool];
   const dirs = String(process.env.PATH || "").split(path.delimiter);
+  const appData = process.env.APPDATA || "";
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const programFiles = process.env.ProgramFiles || "";
+  for (const extra of [
+    path.join(appData, "npm"),
+    path.join(programFiles, "nodejs"),
+    path.join(localAppData, "Microsoft", "WindowsApps"),
+  ]) {
+    if (extra && !dirs.includes(extra)) dirs.push(extra);
+  }
   for (const rawDir of dirs) {
     const dir = rawDir.trim();
     if (!dir) continue;
