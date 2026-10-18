@@ -1414,24 +1414,51 @@ function startTypewriterReveal(
       contentDiv.innerHTML = renderMarkdown(latestText);
       contentDiv.style.visibility = "visible";
       attachCodeCopyButtons(contentDiv.closest(".message"));
+      // Markdown has been parsed, so <pre><code> now exists for detection.
+      if (
+        window.NicoArtifacts &&
+        typeof window.NicoArtifacts.scanMessage === "function" &&
+        typeof window.NicoArtifacts.classifyReply === "function" &&
+        window.NicoArtifacts.classifyReply(latestText)
+      ) {
+        window.NicoArtifacts.scanMessage(contentDiv.closest(".message"));
+      }
       if (typeof onComplete === "function") onComplete();
       return;
     }
 
-    const charactersToReveal = Math.max(1, Math.round(elapsed * 0.035));
+    // Long replies (code, documents) at 3.5% of elapsed time dragged on for
+    // minutes. Reveal quickly at first, then hold a steady rate, and never
+    // fall further behind than a bounded tail.
+    const pending = latestText.length - displayedText.length;
+    let charactersToReveal;
+    if (pending > 4000) {
+      charactersToReveal = Math.max(60, Math.round(pending * 0.25));
+    } else if (pending > 800) {
+      charactersToReveal = Math.max(18, Math.round(elapsed * 0.6));
+    } else {
+      charactersToReveal = Math.max(2, Math.round(elapsed * 0.12));
+    }
     displayedText = latestText.slice(
       0,
       Math.min(latestText.length, displayedText.length + charactersToReveal),
     );
-    contentDiv.textContent = displayedText;
+    // Render progressively but keep the DOM cheap: only re-parse markdown once
+    // the block structure has changed, otherwise just swap the text node.
+    if (/```/.test(displayedText)) {
+      contentDiv.textContent = displayedText;
+    } else {
+      contentDiv.innerHTML = renderMarkdown(displayedText);
+    }
     contentDiv.style.visibility = "visible";
     chatBox.scrollTop = chatBox.scrollHeight;
     animationFrame = requestAnimationFrame(renderNextFrame);
   };
 
+  // Code-heavy replies should not sit hidden behind a 1.2s delay.
   writerTimer = setTimeout(() => {
     animationFrame = requestAnimationFrame(renderNextFrame);
-  }, 1200);
+  }, 120);
 
   return () => {
     if (writerTimer) clearTimeout(writerTimer);

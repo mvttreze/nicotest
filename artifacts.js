@@ -135,16 +135,36 @@
     return lines >= MIN_LINES || code.length >= MIN_CHARS;
   }
 
-  function scanMessage(messageEl) {
-    if (!messageEl || messageEl.dataset.artifactScanned === "1") return;
+  function codeBlocksIn(messageEl) {
     var content = messageEl.querySelector(".content");
-    if (!content) return;
-
+    if (!content) return [];
     var blocks = content.querySelectorAll("pre > code");
+    var out = [];
+    Array.prototype.forEach.call(blocks, function (codeEl) {
+      out.push({ codeEl: codeEl, preEl: codeEl.parentNode });
+    });
+    return out;
+  }
+
+  function scanMessage(messageEl) {
+    if (!messageEl) return;
+    var content = messageEl.querySelector(".content");
+    if (!content || !content.textContent || !content.textContent.trim()) return;
+    // The message node is inserted BEFORE its content streams in, so a scan on
+    // insertion sees an empty div. Only latch once real content has been parsed
+    // into at least one code block, otherwise the artifact is never detected.
+    var hasCode = content.querySelector("pre > code");
+    if (!hasCode) return;
+    if (messageEl.dataset.artifactScanned === "1") return;
+
+    var blocks = codeBlocksIn(messageEl);
+    if (!blocks.length) return;
+
     var autoOpenKey = null;
 
-    Array.prototype.forEach.call(blocks, function (codeEl) {
-      var preEl = codeEl.parentNode;
+    blocks.forEach(function (block) {
+      var codeEl = block.codeEl;
+      var preEl = block.preEl;
       var rawLang = languageOf(codeEl, preEl);
       var type = classify(rawLang, codeEl.textContent);
       if (!type) return;
@@ -157,7 +177,10 @@
       addVersion(key, { type: type, title: title, code: code });
 
       var host = preEl.closest(".code-container") || preEl;
-      if (!host.parentNode || host.parentNode.querySelector(".artifact-offer")) return;
+      if (!host.parentNode) return;
+      // Re-rendering replaces the block, so clear any stale marker first.
+      var staleOffer = host.parentNode.querySelector(".artifact-offer");
+      if (staleOffer) staleOffer.remove();
 
       var offer = document.createElement("div");
       offer.className = "artifact-offer";
@@ -187,6 +210,21 @@
 
     messageEl.dataset.artifactScanned = "1";
     if (autoOpenKey) openArtifact(autoOpenKey);
+  }
+
+  /** Language of the single fenced block in a raw reply. Used by tests and by
+   *  the typewriter fast path so detection can run before markdown rendering. */
+  function classifyReply(rawText) {
+    if (!rawText) return null;
+    var fences = rawText.match(/```([a-zA-Z0-9+-]*)\n([\s\S]*?)```/g);
+    if (!fences) return null;
+    for (var i = 0; i < fences.length; i++) {
+      var m = fences[i].match(/```([a-zA-Z0-9+-]*)\n([\s\S]*?)```/);
+      if (!m) continue;
+      var type = classify(m[1], m[2]);
+      if (type && isSubstantial(m[2])) return type;
+    }
+    return null;
   }
 
   /* -------------------------------------------------------------- versions */
@@ -366,6 +404,17 @@
 
   /* ------------------------------------------------------------------ boot */
 
+  var rescanTimer = null;
+
+  function scheduleRescan() {
+    if (rescanTimer) clearTimeout(rescanTimer);
+    rescanTimer = setTimeout(function () {
+      rescanTimer = null;
+      var messages = document.querySelectorAll("#chatBox .message.assistant");
+      for (var i = messages.length - 1; i >= 0; i--) scanMessage(messages[i]);
+    }, 900);
+  }
+
   function wire() {
     document.getElementById("artifactClose").addEventListener("click", hidePanel);
     document.getElementById("artifactCopy").addEventListener("click", copyArtifact);
@@ -426,6 +475,9 @@
             }
           });
         });
+        // Streaming writes text first and only parses to <pre><code> at the end,
+        // so also give the newest assistant message a debounced re-check.
+        scheduleRescan();
       });
       observer.observe(chatBox, { childList: true, subtree: true });
     }
@@ -458,5 +510,7 @@
     close: hidePanel,
     list: function () { return keysInCurrentConversation(); },
     conversation: currentConversation,
+    classifyReply: classifyReply,
+    scanMessage: scanMessage,
   };
 })();
