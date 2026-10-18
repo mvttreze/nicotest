@@ -56,6 +56,38 @@
     });
   }
 
+  function conversationTitleOf(conversationId) {
+    if (typeof getConversationTitle === "function") {
+      var title = getConversationTitle(conversationId);
+      if (title) return title;
+    }
+    return "Untitled chat";
+  }
+
+  /* Every artifact across every conversation, newest first. */
+  function allArtifacts() {
+    return Object.keys(store)
+      .map(function (key) {
+        var entry = store[key];
+        return {
+          key: key,
+          type: entry.type,
+          title: entry.title,
+          conversationId: entry.conversationId || "",
+          conversationTitle: entry.conversationTitle || "Untitled chat",
+          versionCount: entry.versions.length,
+          updated: entry.updated || 0,
+        };
+      })
+      .sort(function (a, b) {
+        return b.updated - a.updated;
+      });
+  }
+
+  function entryByKey(key) {
+    return store[key] || null;
+  }
+
   /* ---------------------------------------------------------------- store */
 
   function load() {
@@ -235,6 +267,8 @@
       entry = store[key] = {
         type: meta.type,
         title: meta.title,
+        conversationId: currentConversation(),
+        conversationTitle: conversationTitleOf(currentConversation()),
         versions: [],
         active: 0,
         updated: Date.now(),
@@ -247,6 +281,7 @@
     entry.active = entry.versions.length - 1;
     entry.updated = Date.now();
     save();
+    refreshBadge();
   }
 
   /* -------------------------------------------------------------- rendering */
@@ -263,6 +298,7 @@
     openKey = key;
     save();
     showPanel();
+    closeBrowser();
     renderPanel();
   }
 
@@ -344,6 +380,91 @@
     });
   }
 
+  /* -------------------------------------------------------------- library */
+
+  function renderBrowser() {
+    var list = allArtifacts();
+    var countEl = document.getElementById("artifactBrowserCount");
+    var listEl = document.getElementById("artifactBrowserList");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+    if (countEl) {
+      countEl.textContent = list.length
+        ? list.length + (list.length === 1 ? " artifact" : " artifacts")
+        : "";
+    }
+
+    if (!list.length) {
+      var empty = document.createElement("p");
+      empty.className = "artifact-browser-empty";
+      empty.textContent =
+        "No artifacts yet. Ask Nico for a self-contained document, page or component.";
+      listEl.appendChild(empty);
+      return;
+    }
+
+    var currentConv = currentConversation();
+    list.forEach(function (item) {
+      var row = document.createElement("button");
+      row.type = "button";
+      row.className = "artifact-row";
+      if (item.key === openKey) row.classList.add("is-current");
+      if (item.conversationId === currentConv) row.classList.add("is-this-chat");
+
+      var head = document.createElement("span");
+      head.className = "artifact-row-head";
+      var name = document.createElement("span");
+      name.className = "artifact-row-title";
+      name.textContent = item.title;
+      head.appendChild(name);
+
+      var badge = document.createElement("span");
+      badge.className = "artifact-row-type";
+      badge.textContent = item.type.toUpperCase();
+      head.appendChild(badge);
+
+      var meta = document.createElement("span");
+      meta.className = "artifact-row-meta";
+      var chatName =
+        item.conversationId === currentConv
+          ? "This chat"
+          : item.conversationTitle;
+      meta.textContent =
+        chatName + " · " + item.versionCount + (item.versionCount === 1 ? " version" : " versions");
+      if (item.key === openKey) meta.textContent += " · open";
+
+      row.appendChild(head);
+      row.appendChild(meta);
+
+      row.addEventListener("click", function () {
+        openArtifact(item.key);
+      });
+      listEl.appendChild(row);
+    });
+  }
+
+  function openBrowser() {
+    if (!panel) return;
+    var browser = document.getElementById("artifactBrowser");
+    if (!browser) return;
+    renderBrowser();
+    browser.hidden = false;
+    showPanel();
+  }
+
+  function closeBrowser() {
+    var browser = document.getElementById("artifactBrowser");
+    if (browser) browser.hidden = true;
+  }
+
+  function refreshBadge() {
+    var badge = document.getElementById("quickArtifactCount");
+    if (!badge) return;
+    var total = Object.keys(store).length;
+    badge.textContent = String(total);
+    badge.hidden = total === 0;
+  }
+
   /* ---------------------------------------------------------------- exports */
 
   function selfContainedHtml(code) {
@@ -416,7 +537,22 @@
   }
 
   function wire() {
-    document.getElementById("artifactClose").addEventListener("click", hidePanel);
+    document.getElementById("artifactClose").addEventListener("click", function () {
+      closeBrowser();
+      hidePanel();
+    });
+    document.getElementById("artifactBrowserClose").addEventListener("click", closeBrowser);
+    // "All artifacts" in the panel header reopens the library.
+    var titleInput = document.getElementById("artifactTitle");
+    if (titleInput) {
+      var browseBtn = document.createElement("button");
+      browseBtn.type = "button";
+      browseBtn.className = "artifact-btn";
+      browseBtn.textContent = "All";
+      browseBtn.title = "Browse every artifact";
+      browseBtn.addEventListener("click", openBrowser);
+      titleInput.parentNode.insertBefore(browseBtn, titleInput.nextSibling);
+    }
     document.getElementById("artifactCopy").addEventListener("click", copyArtifact);
     document.getElementById("artifactDownload").addEventListener("click", downloadArtifact);
     document.getElementById("artifactErrorOpen").addEventListener("click", openInNewTab);
@@ -507,8 +643,12 @@
 
   window.NicoArtifacts = {
     open: openArtifact,
-    close: hidePanel,
+    close: function () { closeBrowser(); hidePanel(); },
+    browse: openBrowser,
     list: function () { return keysInCurrentConversation(); },
+    all: allArtifacts,
+    entry: entryByKey,
+    refreshBadge: refreshBadge,
     conversation: currentConversation,
     classifyReply: classifyReply,
     scanMessage: scanMessage,

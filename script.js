@@ -476,6 +476,28 @@ function localConversationMessagesKey(conversationId = currentConversationId) {
   return `nico_local_messages:${conversationId}`;
 }
 
+/**
+ * Title of a conversation, for labelling artifacts that came from it.
+ * Tries local storage first, then the rendered Recents list, so it works
+ * for both guest/local chats and signed-in chats without a network call.
+ * Returns null when the conversation is unknown.
+ */
+function getConversationTitle(conversationId) {
+  const id = String(conversationId || "");
+  if (!id) return null;
+  try {
+    if (typeof readLocalConversationList === "function") {
+      const match = readLocalConversationList().find((conv) => conv.id === id);
+      if (match && match.title) return match.title;
+    }
+  } catch (error) {
+    /* fall through to the DOM */
+  }
+  const node = document.querySelector(`.recent-item[data-conversation-id="${id}"] .recent-title`);
+  if (node && node.textContent.trim()) return node.textContent.trim();
+  return null;
+}
+
 function readLocalConversationList() {
   try {
     return JSON.parse(localStorage.getItem(localConversationListKey()) || "[]");

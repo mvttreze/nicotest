@@ -109,7 +109,7 @@
         </button>
 
         <nav class="sidebar-quick" aria-label="Quick access">
-            <a href="#" class="quick-link" data-quick="artifacts"><span class="quick-icon" data-icon="panel"></span><span>Artifacts</span></a>
+            <button type="button" class="quick-link" data-quick="artifacts"><span class="quick-icon" data-icon="panel"></span><span>Artifacts</span><span class="quick-badge" id="quickArtifactCount" hidden>0</span></button>
             <a href="#" class="quick-link" data-quick="gallery"><span class="quick-icon" data-icon="image"></span><span>Gallery</span></a>
             <a href="#" class="quick-link" data-quick="reminders"><span class="quick-icon" data-icon="bell"></span><span>Reminders</span><span class="quick-badge" id="quickReminderCount" hidden>0</span></a>
             <a href="#" class="quick-link" data-quick="projects"><span class="quick-icon" data-icon="document"></span><span>Projects</span></a>
@@ -437,6 +437,16 @@
             <footer class="artifact-footer">
                 <span id="artifactMeta" class="artifact-meta"></span>
             </footer>
+
+            <!-- Library: every artifact across every conversation -->
+            <div id="artifactBrowser" class="artifact-browser" hidden aria-label="All artifacts">
+                <div class="artifact-browser-head">
+                    <strong>All artifacts</strong>
+                    <span id="artifactBrowserCount" class="artifact-browser-count"></span>
+                    <button id="artifactBrowserClose" class="artifact-btn" type="button">Close</button>
+                </div>
+                <div id="artifactBrowserList" class="artifact-browser-list"></div>
+            </div>
         </div>
     </aside>
 </div>

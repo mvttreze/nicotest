@@ -124,6 +124,7 @@
     });
 
     wireQuickAccess();
+    if (window.NicoArtifacts) window.NicoArtifacts.refreshBadge();
     window.NicoIcons = { PATHS: PATHS, iconify: iconify };
   }
 
@@ -154,7 +155,9 @@
       }
     }
 
-    Array.prototype.forEach.call(document.querySelectorAll(".quick-link"), function (link) {
+    Array.prototype.forEach.call(
+      document.querySelectorAll("a.quick-link, button.quick-link"),
+      function (link) {
       link.addEventListener("click", function (event) {
         event.preventDefault();
         var kind = link.getAttribute("data-quick");
@@ -164,10 +167,12 @@
           return;
         }
         if (kind === "artifacts") {
-          if (window.NicoArtifacts && window.NicoArtifacts.list().length) {
-            window.NicoArtifacts.open(window.NicoArtifacts.list().slice(-1)[0]);
+          // Always show the library, so you pick from everything you have made
+          // rather than being dropped into whichever one came last.
+          if (window.NicoArtifacts && typeof window.NicoArtifacts.browse === "function") {
+            window.NicoArtifacts.browse();
           } else {
-            notify("No artifacts yet. Ask for a self-contained document, page or component.");
+            notify("Artifacts are still loading.");
           }
           return;
         }
@@ -177,7 +182,8 @@
             : "Projects are coming next."
         );
       });
-    });
+      }
+    );
 
     renderBadge();
     document.addEventListener("visibilitychange", renderBadge);
