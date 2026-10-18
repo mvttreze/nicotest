@@ -1540,6 +1540,9 @@ body .export-btn .ico { margin-right: 5px; }
   color: var(--text-muted);
   font: 500 0.82rem var(--ui);
   text-decoration: none;
+  /* Anchors and buttons must look identical: no UA fill or border. */
+  background: transparent;
+  border: 1px solid transparent;
   transition: background 0.14s ease, color 0.14s ease;
 }
 .quick-link:hover { background: var(--panel); color: var(--text-primary); }
@@ -1588,8 +1591,16 @@ button.quick-link {
   width: 100%;
   text-align: left;
   font-family: inherit;
+  font-size: inherit;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  /* Reset the UA button chrome: without this the browser paints its own
+     light "buttonface" background and border over the sidebar. */
+  background: transparent;
   border: 1px solid transparent;
+  color: inherit;
+  margin: 0;
 }
 button.quick-link:hover { background: var(--panel); color: var(--text-primary); }
 button.quick-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
