@@ -129,6 +129,113 @@ function evictAttachmentCaches() {
   } catch {}
 }
 
+// =================== Guest quota guard ===================
+// Signed-out users share the owner's Groq/Gemini keys, so we cap the
+// per-day message count. The counter lives in its own key so it survives
+// clearing conversation data, and it resets at local midnight.
+// Env-tunable via NICO_GUEST_QUOTA (kill switch: 0 disables the cap).
+const GUEST_QUOTA_KEY = "nico_guest_quota";
+const GUEST_QUOTA_MAX = Number(
+  (typeof window !== "undefined" &&
+    window.NICO_GUEST_QUOTA_MAX) ||
+    40,
+);
+
+function guestQuotaDayStart() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function readGuestQuota() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(GUEST_QUOTA_KEY) || "null");
+    if (!raw || typeof raw.dayStart !== "number") return { dayStart: guestQuotaDayStart(), count: 0 };
+    // New day → reset.
+    if (raw.dayStart !== guestQuotaDayStart()) {
+      const next = { dayStart: guestQuotaDayStart(), count: 0 };
+      localStorage.setItem(GUEST_QUOTA_KEY, JSON.stringify(next));
+      return next;
+    }
+    return raw;
+  } catch {
+    return { dayStart: guestQuotaDayStart(), count: 0 };
+  }
+}
+
+function writeGuestQuota(state) {
+  try {
+    localStorage.setItem(GUEST_QUOTA_KEY, JSON.stringify(state));
+  } catch {
+    evictAttachmentCaches();
+    try {
+      localStorage.setItem(GUEST_QUOTA_KEY, JSON.stringify(state));
+    } catch {}
+  }
+}
+
+function guestQuotaRemaining() {
+  if (GUEST_QUOTA_MAX <= 0) return Infinity;
+  return Math.max(0, GUEST_QUOTA_MAX - readGuestQuota().count);
+}
+
+function guestQuotaIncrement() {
+  const state = readGuestQuota();
+  state.count += 1;
+  writeGuestQuota(state);
+  return state.count;
+}
+
+function guestQuotaExhausted() {
+  if (GUEST_QUOTA_MAX <= 0) return false;
+  return readGuestQuota().count >= GUEST_QUOTA_MAX;
+}
+
+function renderGuestQuotaInSidebar() {
+  const el = document.getElementById("guest-quota-remaining");
+  const row = document.getElementById("guest-quota-row");
+  if (!el) return;
+  if (GUEST_QUOTA_MAX <= 0) {
+    el.textContent = "";
+    el.hidden = true;
+    if (row) row.hidden = true;
+    return;
+  }
+  const remaining = guestQuotaRemaining();
+  el.hidden = false;
+  el.textContent = remaining > 0
+    ? `${remaining} guest messages left today`
+    : "Daily guest limit reached — sign in to keep chatting";
+  if (row) row.hidden = false;
+}
+
+function applyGuestQuotaGuard() {
+  const userInputElement = userInput;
+  const sendBtnElement = sendBtn;
+  const currentConversationIdElement = currentConversationId;
+
+  if (!currentUser && !guestQuotaExhausted()) {
+    appendLocalConversationMessage(currentConversationId, userInput.value.trim() || "", []);
+  }
+
+  if (guestQuotaExhausted()) {
+    showComposerToast("Daily guest limit reached — sign in to keep chatting");
+    userInput.value = "";
+    userInput.setAttribute("readonly", "");
+    userInput.setAttribute("placeholder", "Sign in to continue");
+    if (sendBtn) sendBtn.disabled = true;
+    return;
+  }
+
+  const indicator = document.getElementById("typingIndicator");
+  const quotaIndicator = document.getElementById("guest-quota-indicator");
+  if (quotaIndicator) {
+    const remaining = guestQuotaRemaining();
+    quotaIndicator.textContent = `(${remaining} / ${GUEST_QUOTA_MAX})`;
+    quotaIndicator.style.display = "inline";
+  }
+}
+
 const NICO_MIDNIGHT_BLUE = "#6ea8ff";
 
 function nicoLogoInner(A, personality) {
@@ -1611,6 +1718,21 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
       upsertLocalConversation({ id: currentConversationId, title: "Untitled Chat", user_id: currentUser.id });
     }
     if (settings.sound) playCompletionChime();
+    // After a guest's first assistant reply, offer a non-blocking sign-in
+    // prompt inline under the message. Never a modal — just a row.
+    if (!currentUser && !localStorage.getItem("nico_guest_prompted")) {
+      try { localStorage.setItem("nico_guest_prompted", "1"); } catch {}
+      const row = document.createElement("div");
+      row.className = "guest-signin-prompt";
+      row.innerHTML =
+        `Keep this chat → <a href="#" id="guest-signin-prompt-link">Sign in</a> · ` +
+        `Guest chats stay on this device`;
+      row.querySelector("#guest-signin-prompt-link").addEventListener("click", (e) => {
+        e.preventDefault();
+        signInWithGoogle();
+      });
+      assistantMsgDiv.appendChild(row);
+    }
     loadRecentConversations();
   } catch (error) {
     if (typingDelayTimer) {
@@ -3634,6 +3756,20 @@ async function sendMessage() {
     autoGrowComposer();
     return;
   }
+  // Guest quota guard: signed-out users share the owner's keys, so cap the
+  // per-day chat count. Local commands above don't count — only real turns.
+  if (!currentUser && guestQuotaExhausted()) {
+    showComposerToast("Daily guest limit reached — sign in to keep chatting");
+    userInput.value = "";
+    userInput.setAttribute("readonly", "");
+    userInput.setAttribute("placeholder", "Sign in to continue");
+    if (sendBtn) sendBtn.disabled = true;
+    return;
+  }
+  if (!currentUser) {
+    guestQuotaIncrement();
+    renderGuestQuotaInSidebar();
+  }
   const attachmentRequest = await buildMessageWithAttachments(typedMessage);
   // Never silently drop the files: if nothing usable could be read, stop
   // here instead of sending a text-only message Nico will misread.
@@ -4105,6 +4241,20 @@ function initializeSettingsPanel() {
     applySettings();
   });
 
+  // Low-key, dismissible notice for guests about what an account adds.
+  const guestNotice = document.getElementById("guestNotice");
+  const guestNoticeDismiss = document.getElementById(
+    "guestNoticeDismiss",
+  );
+  if (guestNotice && guestNoticeDismiss) {
+    const acked = localStorage.getItem("nico_guest_notice_ack") === "1";
+    if (!acked) guestNotice.hidden = false;
+    guestNoticeDismiss.addEventListener("click", () => {
+      guestNotice.hidden = true;
+      try { localStorage.setItem("nico_guest_notice_ack", "1"); } catch {}
+    });
+  }
+
   document.querySelectorAll(".settings-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".settings-tab").forEach((candidate) => {
@@ -4251,7 +4401,11 @@ function updateAuthUi(user) {
 
   currentUser = user;
   if (!user) {
-    setAuthScreenVisible(true);
+    // A guest who already acknowledged guest mode on a prior visit should
+    // not be re-blocked by the auth sheet — sign-in stays available in the
+    // sidebar instead. Empty-means-deny: no badge check ever grants access.
+    const guestAcked = localStorage.getItem("nico_guest_ack") === "1";
+    setAuthScreenVisible(!guestAcked);
     authUiInitialized = false;
     userName.textContent = "Not signed in";
     if (welcomeName) welcomeName.textContent = "User";
@@ -4261,6 +4415,7 @@ function updateAuthUi(user) {
     signOutButton.hidden = true;
     if (developerBadge) developerBadge.hidden = true;
     if (ownerBadge) ownerBadge.hidden = true;
+    myBadges = [];
     loadMyBadges();
     currentUser = null;
     const restored = localStorage.getItem("active_chat_id");
@@ -4275,6 +4430,7 @@ function updateAuthUi(user) {
         getAssistantThinkingLabel();
     }
     setDeveloperDashboardVisibility(null);
+    renderGuestQuotaInSidebar();
     return;
   }
 
@@ -4456,6 +4612,35 @@ function initializeAuthScreen() {
   appleButton?.addEventListener("click", () => {
     alert("Apple sign-in is not configured yet.");
   });
+
+  // Guest entry: a secondary, non-emphasized link below the sign-in form.
+  const guestLink = document.getElementById("guestLink");
+  if (guestLink) {
+    guestLink.addEventListener("click", (event) => {
+      event.preventDefault();
+      dismissAuthScreen();
+    });
+  }
+
+  // Dismissible sheet: top-right X closes the auth screen entirely.
+  const authDismissBtn = document.getElementById("authDismissBtn");
+  if (authDismissBtn) {
+    authDismissBtn.addEventListener("click", () => {
+      dismissAuthScreen();
+    });
+  }
+}
+
+function dismissAuthScreen() {
+  const authScreen = document.getElementById("authScreen");
+  const appView = document.querySelector(".app-layout");
+  if (authScreen) authScreen.classList.remove("is-visible");
+  if (appView) appView.classList.remove("auth-visible");
+  storageSet("nico_guest_ack", "1");
+  if (!currentUser) {
+    // A guest who dismissed is still a guest: no badge check can grant access.
+    myBadges = [];
+  }
 }
 
 async function signInWithGoogle() {
@@ -5117,9 +5302,20 @@ document
   .getElementById("closeAdminDashboardBtn")
   ?.addEventListener("click", closeDeveloperDashboard);
 
+// Guest sidebar sign-in link + inline sign-in prompt link both route here.
+document.getElementById("guest-sign-in-link")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  signInWithGoogle();
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeDeveloperDashboard();
+    // Esc also dismisses the auth sheet if it's up.
+    const authScreen = document.getElementById("authScreen");
+    if (authScreen && authScreen.classList.contains("is-visible")) {
+      dismissAuthScreen();
+    }
   }
 });
 
@@ -5132,4 +5328,7 @@ bootReminders();
 wireExportMenu();
 refreshAnnouncement();
 setInterval(refreshAnnouncement, 60000);
+// Refresh the guest quota display at midnight + on focus (handles day rollover).
+setInterval(renderGuestQuotaInSidebar, 60000);
+window.addEventListener("focus", renderGuestQuotaInSidebar);
 focusInput();

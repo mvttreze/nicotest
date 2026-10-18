@@ -2,53 +2,89 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 :root {
-    --bg-main: #050816;
-    --bg-accent: #0c1220;
-    --bg-deep: rgba(9, 12, 20, 0.82);
-    --glass-bg: rgba(140, 190, 255, 0.08);
-    --glass-bg-strong: rgba(255, 255, 255, 0.12);
-    --glass-bg-hover: rgba(120, 208, 255, 0.14);
-    --glass-bg-active: rgba(110, 200, 255, 0.18);
-    --glass-border: 1px solid rgba(255, 255, 255, 0.12);
-    --glass-border-glow: 1px solid rgba(182, 234, 255, 0.45);
-    --text-primary: #edf3ff;
-    --text-muted: rgba(226, 234, 255, 0.66);
-    --accent-glow: rgba(70, 188, 255, 0.24);
-    --sidebar-width: 280px;
-    --accent: #7fe3ff;
-    --font-scale: 1;
-    --shadow-soft: 0 20px 60px rgba(0, 0, 0, 0.38);
-    --shadow-glow: 0 0 30px rgba(82, 202, 255, 0.2);
+    /* Claude Web Design Tokens - Light Theme */n    --bg-main: #faf9f7;
+    --bg-surface: #ffffff;
+    --bg-elevated: #f3f1ee;
+    --text-primary: #1f1e1d;
+    --text-muted: #6b6a68;
+    --text-faint: #8a8985;
+    --border: #e5e3df;
+    --accent: #c96442;
+
+    /* Radii */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+
+    /* Spacing */
+    --space-xxs: 4px;
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-xxl: 48px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+
+    /* Typography */
+    --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-display: ui-serif, Georgia, "Times New Roman", serif;
+    --font-size-base: 15px;
+    --font-size-lg: 16px;
+    --line-height: 1.65;
+
+    /* Animation */
+    --duration-fast: 150ms;
+    --duration-normal: 220ms;
+    --ease: ease;
+
+    /* Z-index */
+    --z-sidebar: 1000;
+    --z-modal: 2000;
+    --z-artifact: 1500;
+}
+
+/* Dark theme overrides - applied via body.theme-dark class */
+body.theme-dark {
+    --bg-main: #1f1e1d;
+    --bg-surface: #262624;
+    --bg-elevated: #2f2e2c;
+    --text-primary: #f5f4f2;
+    --text-muted: #a3a19c;
+    --text-faint: #7a7975;
+    --border: #3d3d3b;
+    --accent: #d97757;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }
 
 body {
-    background:
-        radial-gradient(circle at 15% 15%, rgba(104, 240, 255, 0.26), transparent 28%),
-        radial-gradient(circle at 80% 20%, rgba(100, 120, 255, 0.26), transparent 30%),
-        linear-gradient(135deg, #040814 0%, #081520 42%, #040d1d 100%);
+    background: var(--bg-main);
     color: var(--text-primary);
     height: 100vh;
     overflow: hidden;
     position: relative;
-    font-size: 1rem;
+    font-size: var(--font-size-base);
+    font-family: var(--font-ui);
+    line-height: var(--line-height);
 }
-
-body.theme-cyberpunk { --accent: #67f7d1; --accent-glow: rgba(103, 247, 209, 0.28); }
-body.theme-sunset { --accent: #ff9f68; --accent-glow: rgba(255, 159, 104, 0.24); }
-body.theme-aurora { --bg-main: #08151b; --bg-accent: #112a32; --accent: #72f1c5; --accent-glow: rgba(114, 241, 197, 0.24); --glass-bg-hover: rgba(114, 241, 197, 0.12); --glass-bg-active: rgba(114, 241, 197, 0.18); }
-body.theme-ocean { --bg-main: #06111e; --bg-accent: #0a1e31; --accent: #62b8ff; --accent-glow: rgba(98, 184, 255, 0.24); --glass-bg-hover: rgba(98, 184, 255, 0.12); --glass-bg-active: rgba(98, 184, 255, 0.18); }
-body.theme-forest { --bg-main: #0b1510; --bg-accent: #122417; --accent: #a7e46f; --accent-glow: rgba(167, 228, 111, 0.22); --glass-bg-hover: rgba(167, 228, 111, 0.12); --glass-bg-active: rgba(167, 228, 111, 0.17); }
-body.theme-graphite { --bg-main: #111214; --bg-accent: #1e2228; --accent: #d7dbe3; --accent-glow: rgba(215, 219, 227, 0.14); --glass-bg-hover: rgba(215, 219, 227, 0.1); --glass-bg-active: rgba(215, 219, 227, 0.16); }
-body.theme-cotton-candy { --bg-main: #190f1b; --bg-accent: #251629; --accent: #ff9fd7; --accent-glow: rgba(255, 159, 215, 0.24); --glass-bg-hover: rgba(255, 159, 215, 0.12); --glass-bg-active: rgba(255, 159, 215, 0.18); }
-body.theme-brainrot { --bg-main: #07100b; --bg-accent: #0f1b11; --accent: #b6f36b; --accent-glow: rgba(182, 243, 107, 0.2); --glass-bg-hover: rgba(182, 243, 107, 0.1); --glass-bg-active: rgba(182, 243, 107, 0.16); }
-body.theme-light { --bg-main: #eef2f7; --bg-accent: #ffffff; --text-primary: #1c2430; --text-muted: rgba(28, 36, 48, 0.58); --glass-bg: rgba(255, 255, 255, 0.7); --glass-bg-hover: rgba(255, 255, 255, 0.92); --glass-bg-active: rgba(20, 30, 45, 0.12); }
-body.custom-background { background-image: linear-gradient(rgba(7, 8, 10, 0.58), rgba(7, 8, 10, 0.7)), var(--custom-background-image); background-size: cover; background-position: center; background-attachment: fixed; }
-body.custom-background.theme-light { background-image: linear-gradient(rgba(238, 242, 247, 0.68), rgba(238, 242, 247, 0.78)), var(--custom-background-image); }
-body.font-mono, body.font-mono button, body.font-mono input, body.font-mono select, body.font-mono textarea { font-family: "Courier New", monospace; }
 
 body::before {
     content: '';

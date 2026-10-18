@@ -40,6 +40,7 @@
 
 <div class="auth-screen is-visible" id="authScreen" aria-live="polite">
     <div class="auth-card">
+        <button id="authDismissBtn" class="auth-dismiss" type="button" aria-label="Continue without signing in" title="Continue as guest">✕</button>
         <div class="auth-logo" aria-label="Nico logo"><svg viewBox="0 0 512 512" role="img" aria-label="Nico"><rect x="42" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><rect x="455" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" style="fill:var(--accent)"/><path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" style="fill:var(--accent)"/><path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" style="fill:var(--accent)"/><rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/><path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" style="fill:var(--accent)"/><path d="M260 258 C260 236 280 222 302 222 C324 222 344 236 344 258 C344 266 338 271 330 271 L276 271 C268 271 260 266 260 258 Z" style="fill:var(--accent)"/><path d="M238 296 Q256 312 274 296" fill="none" style="stroke:var(--accent)" stroke-width="11" stroke-linecap="round"/></svg></div>
         <h1>Sign in to Nico</h1>
 
@@ -89,6 +90,10 @@
         <div class="auth-footer auth-footer-small">
             <a href="#">Sign in with a passkey</a>
         </div>
+
+        <div class="auth-footer">
+            <a href="#" id="guestLink">Continue as guest</a>
+        </div>
     </div>
 </div>
 
@@ -128,6 +133,10 @@
                     </div>
                 </div>
                 <button id="settingsBtn" class="settings-btn" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settingsPanel" title="Settings">⚙</button>
+            </div>
+            <div class="guest-quota-row" id="guest-quota-row" hidden>
+                <span id="guest-quota-remaining"></span>
+                <a href="#" id="guest-sign-in-link">Sign in</a>
             </div>
         </div>
     </aside>
@@ -283,6 +292,10 @@
                         <button class="auth-btn" id="sign-in-btn" type="button">Sign in with Google</button>
                         <button class="auth-btn" id="sign-out-btn" type="button" hidden>Sign out</button>
                     </div>
+                    <div class="guest-notice" id="guestNotice" hidden>
+                        <p>Guest chats stay on this device and are lost if you clear site data.</p>
+                        <button type="button" id="guestNoticeDismiss" class="settings-action-btn">Dismiss</button>
+                    </div>
                     <div class="settings-actions">
                         <button id="openAdminDashboardBtn" type="button">Developer dashboard</button>
                         <button id="exportMarkdownBtn" type="button">Export Markdown</button>
@@ -344,11 +357,40 @@
                     <button type="button" data-prompt="Briefing">Morning briefing</button>
                 </div>
             </div>
-            
+
             <div class="chat-box" id="chatBox">
                 <div id="typingIndicator" class="message assistant thinking-indicator" aria-hidden="true" style="display:none">Nico is thinking...</div>
             </div>
         </div>
+
+        <!-- Artifact panel: slides in from the right, resizable, collapsible -->
+        <aside id="artifactPanel" class="artifact-panel" aria-hidden="true" hidden>
+            <div class="artifact-resizer" id="artifactResizer" aria-hidden="true" title="Drag to resize"></div>
+            <div class="artifact-inner">
+                <header class="artifact-header">
+                    <div class="artifact-type-icon" id="artifactTypeIcon" aria-hidden="true">✦</div>
+                    <input class="artifact-title-input" id="artifactTitleInput" type="text" aria-label="Artifact title" />
+                    <div class="artifact-version-switcher" id="artifactVersionSwitcher" aria-label="Artifact versions"></div>
+                    <div class="artifact-header-actions">
+                        <button class="artifact-btn" id="artifactCopyBtn" type="button" aria-label="Copy source">Copy</button>
+                        <button class="artifact-btn" id="artifactDownloadBtn" type="button" aria-label="Download">Download</button>
+                        <button class="artifact-btn" id="artifactNewTabBtn" type="button" aria-label="Open in new tab" hidden>Open</button>
+                        <button class="artifact-btn" id="artifactDeleteVersionBtn" type="button" aria-label="Delete this version">Delete</button>
+                    </div>
+                    <button class="artifact-close" id="artifactCloseBtn" type="button" aria-label="Close artifact panel">×</button>
+                </header>
+                <div class="artifact-body" id="artifactBody"></div>
+                <div class="artifact-error" id="artifactError" hidden>
+                    <p>Couldn't render this artifact.</p>
+                    <div class="artifact-error-actions">
+                        <button id="artifactErrorNewTab" type="button">Open in new tab</button>
+                        <button id="artifactErrorDownload" type="button">Download</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <button id="artifactToggleBtn" class="artifact-toggle-btn" type="button" aria-label="Open artifacts" hidden>✦</button>
 
         <!-- Floating Glass Input Bar -->
         <div class="input-wrapper" id="inputWrapper">
