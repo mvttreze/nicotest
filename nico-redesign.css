@@ -341,3 +341,101 @@ body .message.user .inline-editor{width:100%}
 .inline-editor-save{border-radius:10px;border:0;background:var(--grad);color:#fff;font:600 .76rem var(--ui);padding:.5rem 1rem;cursor:pointer}
 .inline-editor-cancel{border-radius:10px;border:1px solid var(--line);background:transparent;color:inherit;font:600 .76rem var(--ui);padding:.5rem 1rem;cursor:pointer}
 .inline-editor-cancel:hover{border-color:var(--accent)}
+
+/* ================================================================
+   CLAUDE WEB REDESIGN - PHASE 1: design tokens
+   Appended on purpose: this file loads AFTER style.css, so nothing
+   above is touched and reverting is a single delete of this block.
+   NOTE: in this app the DEFAULT theme (no class on body) is dark.
+   Light is opt-in via body.theme-light.
+   ================================================================ */
+
+:root {
+  /* ---- surfaces (dark is the default theme) ---- */
+  --bg-main: #1f1e1d;
+  --bg-accent: #262624;
+  --bg-deep: rgba(31, 30, 29, 0.92);
+  --glass-bg: #262624;
+  --glass-bg-strong: #2f2e2c;
+  --glass-bg-hover: #2f2e2c;
+  --glass-bg-active: #3a3836;
+
+  /* ---- lines and text ---- */
+  --glass-border: 1px solid #3d3d3b;
+  --glass-border-glow: 1px solid transparent;
+  --text-primary: #f5f4f2;
+  --text-muted: #a3a19c;
+  --text-faint: #7a7975;
+
+  /* ---- accent (no glow) ---- */
+  --accent: #d97757;
+  --accent-glow: rgba(217, 119, 87, 0.16);
+
+  /* ---- elevation: soft only, never a glow ---- */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-glow: none;
+
+  /* ---- skin tokens (from nico-redesign.css :root) ---- */
+  --r-lg: 16px;
+  --r-md: 12px;
+  --line: #3d3d3b;
+  --panel: #2f2e2c;
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: ui-serif, Georgia, "Times New Roman", serif;
+}
+
+/* body-level skin tokens (same specificity as the block above, later wins) */
+body {
+  --surface: #262624;
+  --accent-2: #d97757;
+  --grad: #d97757;
+  --ring: #3d3d3b;
+}
+
+/* Claude Web is flat: drop the layered radial auras. */
+body:not(.custom-background) {
+  background: var(--bg-main);
+}
+
+/* ---- light theme (opt-in) ---- */
+body.theme-light {
+  --bg-main: #faf9f7;
+  --bg-accent: #ffffff;
+  --bg-deep: rgba(31, 30, 29, 0.4);
+  --glass-bg: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-bg-hover: #f3f1ee;
+  --glass-bg-active: #eceae6;
+  --glass-border: 1px solid #e5e3df;
+  --glass-border-glow: 1px solid transparent;
+  --text-primary: #1f1e1d;
+  --text-muted: #6b6a68;
+  --text-faint: #8a8985;
+  --accent: #c96442;
+  --accent-glow: rgba(201, 100, 66, 0.14);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --line: #e5e3df;
+  --panel: #f3f1ee;
+  --surface: #ffffff;
+  --grad: #c96442;
+  --ring: #e5e3df;
+}
+
+body.custom-background.theme-light {
+  background-image: linear-gradient(rgba(250, 249, 247, 0.72), rgba(250, 249, 247, 0.82)), var(--custom-background-image);
+}
+
+/* ---- typography ---- */
+body {
+  font-family: var(--ui);
+  font-size: calc(15px * var(--font-scale, 1));
+  line-height: 1.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
