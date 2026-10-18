@@ -18,6 +18,7 @@ const FILES = [
   "gallery.js",
   "settings-ui.js",
   "greetings.js",
+  "panel-dismiss.js",
   "nico-ui.js",
   "style.css",
   "nico-redesign.css",

@@ -304,11 +304,15 @@
 
   function showPanel() {
     if (!panel) return;
+    // Only one drawer at a time: close whichever is open before this one.
+    if (window.NicoPanelDismiss) window.NicoPanelDismiss.closeOthers();
     panel.hidden = false;
     panel.setAttribute("aria-hidden", "false");
     panel.classList.add("is-open");
     document.documentElement.classList.add("artifacts-open");
     if (toggleBtn) toggleBtn.hidden = true;
+    // Drawn behind the panel so tapping the empty space beside it closes.
+    if (window.NicoPanelDismiss) window.NicoPanelDismiss.sync();
   }
 
   function hidePanel() {
@@ -317,6 +321,7 @@
     panel.setAttribute("aria-hidden", "true");
     document.documentElement.classList.remove("artifacts-open");
     if (toggleBtn) toggleBtn.hidden = false;
+    if (window.NicoPanelDismiss) window.NicoPanelDismiss.sync();
   }
 
   function renderPanel() {
@@ -633,6 +638,26 @@
     toggleBtn = document.getElementById("artifactToggle");
     store = load();
     wire();
+    // Tapping the space beside the panel dismisses it, on desktop and on the
+    // mobile bottom sheet alike.
+    if (window.NicoPanelDismiss) {
+      window.NicoPanelDismiss.register({
+        panel: panel,
+        scrimZ: 59,
+        isOpen: function () {
+          return panel.classList.contains("is-open");
+        },
+        close: function () {
+          closeBrowser();
+          hidePanel();
+        },
+        triggers: [toggleBtn].concat(
+          Array.prototype.slice.call(
+            document.querySelectorAll('[data-quick="artifacts"]'),
+          ),
+        ),
+      });
+    }
   }
 
   if (document.readyState === "loading") {

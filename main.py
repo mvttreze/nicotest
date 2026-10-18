@@ -2049,14 +2049,27 @@ def _save_generated_pair(user, conversation_id, user_content, assistant_content,
          "created_at": stamp},
       ])
     else:
-      supabase_client.table("messages").insert([
+      # Every row MUST carry the same keys. PostgREST rejects a batch whose
+      # objects differ ("PGRST102: All object keys must match"), which failed
+      # the whole insert and left the conversation permanently empty.
+      rows = [
         {"role": "user", "content": user_content,
-         "conversation_id": conversation_id},
+         "conversation_id": conversation_id, "attachments": []},
         {"role": "assistant", "content": assistant_content,
          "conversation_id": conversation_id, "attachments": attachments},
-      ]).execute()
-  except Exception:
-    pass
+      ]
+      try:
+        supabase_client.table("messages").insert(rows).execute()
+      except Exception:
+        # Older databases may lack the attachments column: fall back to the
+        # single-row helper, which already degrades one column at a time.
+        for row in rows:
+          insert_message(dict(row))
+  except Exception as error:
+    # Never fail a render over a failed save, but never lose it silently
+    # either: swallowing this is what hid the empty-history bug.
+    print(f"[nico] generated {fallback_title!r} not saved to "
+          f"{conversation_id}: {error}", flush=True)
 
 
 def get_user_memories(user):

@@ -1,4 +1,4 @@
-const CACHE_NAME = "nico-shell-v10";
+const CACHE_NAME = "nico-shell-v11";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ const APP_SHELL = [
   "./gallery.js",
   "./settings-ui.js",
   "./greetings.js",
+  "./panel-dismiss.js",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",

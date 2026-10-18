@@ -255,10 +255,14 @@
     if (!panel) return;
     closeViewer();
     renderGrid();
+    // Only one drawer at a time: close whichever is open before this one.
+    if (window.NicoPanelDismiss) window.NicoPanelDismiss.closeOthers();
     panel.hidden = false;
     panel.setAttribute("aria-hidden", "false");
     panel.classList.add("is-open");
     document.documentElement.classList.add("gallery-open");
+    // Drawn behind the panel so tapping the empty space beside it closes.
+    if (window.NicoPanelDismiss) window.NicoPanelDismiss.sync();
   }
 
   function closeGallery() {
@@ -267,6 +271,7 @@
     panel.classList.remove("is-open");
     panel.setAttribute("aria-hidden", "true");
     document.documentElement.classList.remove("gallery-open");
+    if (window.NicoPanelDismiss) window.NicoPanelDismiss.sync();
   }
 
   function wire() {
@@ -347,6 +352,21 @@
     items = load();
     wire();
     refreshBadge();
+    // Tapping the space beside the panel dismisses it, on desktop and on the
+    // mobile bottom sheet alike.
+    if (window.NicoPanelDismiss) {
+      window.NicoPanelDismiss.register({
+        panel: panel,
+        scrimZ: 61,
+        isOpen: function () {
+          return panel.classList.contains("is-open");
+        },
+        close: closeGallery,
+        triggers: Array.prototype.slice.call(
+          document.querySelectorAll('[data-quick="gallery"]'),
+        ),
+      });
+    }
   }
 
   if (document.readyState === "loading") {

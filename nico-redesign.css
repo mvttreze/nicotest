@@ -2343,3 +2343,355 @@ body .welcome-title .welcome-name {
     transition: none !important;
   }
 }
+
+/* ================================================================
+   CLAUDE WEB REDESIGN - PART K: dismissible panels
+   A dim layer sits behind the Artifacts and Gallery panels, so the
+   empty space beside them reads as tappable and dismisses on tap.
+   ================================================================ */
+
+.panel-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 6, 12, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  /* Compositor-only: no layout, no repaint while scrolling. */
+  transition: opacity 0.22s ease;
+  will-change: opacity;
+}
+.panel-scrim.is-on {
+  opacity: 1;
+}
+
+/* The chat must not stay squeezed while a panel is open on a phone. */
+@media (max-width: 900px) {
+  html.artifacts-open body .chat-box,
+  html.artifacts-open body .input-wrapper,
+  html.gallery-open body .chat-box,
+  html.gallery-open body .input-wrapper {
+    max-width: none;
+  }
+}
+
+/* ================================================================
+   PART K2: the same panels as bottom sheets on phones
+   A full-width panel leaves nothing to tap outside, so the sheet stops
+   short of the top of the screen. The strip above it is the dismiss
+   target, the mobile equivalent of "click beside it".
+   ================================================================ */
+@media (max-width: 900px) {
+  .artifact-panel,
+  .gallery-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: min(78dvh, 640px);
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.22, 0.9, 0.3, 1);
+    box-shadow: 0 -14px 44px rgba(0, 0, 0, 0.32);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    overscroll-behavior: contain;
+  }
+  .artifact-panel.is-open,
+  .gallery-panel.is-open {
+    transform: none;
+  }
+
+  /* Drag handle, a hint only: it sits inside the panel so tapping it does
+     not dismiss, which stops a mis-tap closing what you just opened. */
+  .artifact-header,
+  .gallery-header {
+    position: relative;
+    padding-top: 18px;
+  }
+  .artifact-header::before,
+  .gallery-header::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 38px;
+    height: 4px;
+    margin-left: -19px;
+    border-radius: 99px;
+    background: var(--line);
+  }
+
+  /* A resizer means nothing for a sheet. */
+  .artifact-resizer,
+  .gallery-resizer {
+    display: none;
+  }
+
+  .artifact-body,
+  .gallery-grid {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* Close is the primary way out, so give it a thumb-sized target. */
+  .artifact-close,
+  .gallery-close {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+    font-size: 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-scrim {
+    transition: none;
+  }
+  .artifact-panel,
+  .gallery-panel {
+    transition: none !important;
+  }
+}
+
+/* ================================================================
+   CLAUDE WEB REDESIGN - PART L: phone layout
+
+   Three goals, in order of how much they matter on a real handset:
+
+   LIGHT      A backdrop blur costs a full-screen readback every frame on
+               a phone GPU. Nine surfaces had one. They are replaced with
+               opaque colour and the idle loops are stopped, which is most
+               of the "why is this laggy" budget.
+
+   FLEXIBLE   Dynamic viewport units instead of 100vh, real safe-area
+               insets, and a layout that holds up from a 320px phone to a
+               landscape tablet without needing a second design.
+
+   SMOOTH     Animations touch only transform/opacity, scrollers get
+               momentum and containment, and off-screen messages are
+               skipped entirely so a long chat stays cheap to scroll.
+   ================================================================ */
+
+@media (max-width: 768px) {
+  /* ---------- A. stop the expensive compositing ---------- */
+
+  /* Solid colour in place of blurred glass. --bg-accent and --surface
+     are opaque, so nothing shows through without the blur. */
+  body .sidebar,
+  body .input-pill,
+  body .top-header,
+  body .settings-panel,
+  body .admin-dashboard-panel,
+  body .add-files-dropdown,
+  body .code-container,
+  body .message.assistant,
+  .sidebar-overlay.active,
+  .auth-card,
+  .nico-overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  body .sidebar,
+  body .input-pill,
+  body .top-header,
+  body .settings-panel {
+    background: var(--bg-accent) !important;
+  }
+  body .message.assistant,
+  body .code-container,
+  body .add-files-dropdown,
+  body .admin-dashboard-panel {
+    background: var(--surface) !important;
+  }
+  /* The ambient radial wash repaints a very large area; one flat fill
+     reads the same at this size and costs nothing. */
+  body:not(.custom-background) {
+    background: var(--bg-main) !important;
+  }
+  body .welcome-container::before {
+    display: none !important;
+  }
+
+  /* ---------- B. stop idle animation ---------- */
+
+  /* These loop forever whether or not anyone is looking. */
+  body .credits-mark,
+  body .welcome-container,
+  .credits-row,
+  .palette-box,
+  .credits-card {
+    animation: none !important;
+  }
+  body .welcome-title,
+  body .welcome-subtitle,
+  .welcome-suggestions button {
+    animation: none !important;
+  }
+
+  /* ---------- C. scrolling ---------- */
+
+  body .chat-box,
+  body .sidebar-section,
+  body .settings-scroll,
+  .artifact-browser-list,
+  .gallery-grid,
+  .artifact-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  /* Keep scroll work on its own layer so a repaint inside the transcript
+     cannot force the whole page to recomposite. */
+  body .chat-box {
+    contain: layout paint;
+  }
+
+  /* ---------- D. touch ergonomics ---------- */
+
+  html {
+    /* Kills the 300ms double-tap delay without breaking normal taps. */
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body,
+  body * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* iOS zooms the whole page when a focused field is under 16px. */
+  body input,
+  body textarea,
+  body select {
+    font-size: max(16px, 1em);
+  }
+
+  /* Anything you tap with a thumb gets a real target. */
+  body .msg-action-btn,
+  body .artifact-btn,
+  body .gallery-btn,
+  body .settings-action-btn,
+  .recent-item .conversation-actions button,
+  .mode-chips label,
+  .welcome-suggestions button {
+    min-height: 44px;
+  }
+  .icon-btn,
+  .top-header-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* ---------- E. flexible frame ---------- */
+
+  /* dvh tracks the collapsing URL bar; svh or lvh would jump. */
+  html,
+  body,
+  body .app-layout,
+  body .main-content {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+  body .app-layout {
+    /* Full bleed: the gutters cost usable width on a small phone. */
+    padding: 0;
+    gap: 0;
+  }
+  body .sidebar {
+    border-radius: 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  body .chat-container {
+    /* Notch in portrait, home indicator in landscape. */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* The composer must never sit under the home indicator. */
+  body .input-wrapper {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Landscape on a phone: vertical space is the scarce resource. */
+  @media (orientation: landscape) and (max-height: 480px) {
+    body .welcome-container {
+      padding-top: 2vh;
+      padding-bottom: 2vh;
+    }
+    body .welcome-title {
+      font-size: clamp(1.5rem, 6vw, 2rem);
+    }
+    .welcome-suggestions {
+      display: none;
+    }
+    body .settings-panel {
+      max-height: 92dvh;
+    }
+  }
+
+  /* ---------- F. type that fits ---------- */
+
+  body .welcome-title {
+    font-size: clamp(1.7rem, 8.5vw, 2.4rem);
+  }
+  body .message {
+    font-size: max(15px, 1rem);
+  }
+  /* Long words and URLs are the usual cause of sideways scroll. */
+  body .message .content {
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- G. long chats stay cheap ---------- */
+
+  /* Isolate each message's layout and paint so one long code block cannot
+     force the whole transcript to repaint.
+
+     Deliberately NOT content-visibility: auto. It collapses off-screen
+     messages down to the intrinsic size, which shrank the scrollable
+     height of a 120-message chat by 7500px and broke the bottom anchor
+     that appendMessage relies on. Measured, not assumed. */
+  body .chat-box .message {
+    contain: layout paint;
+  }
+
+  /* ---------- H. panels and sheets ---------- */
+
+  body .artifact-panel,
+  body .gallery-panel {
+    contain: layout paint;
+  }
+  /* Scrims cover the whole screen and animate; keep that off the paint
+     path of everything behind them. */
+  .panel-scrim {
+    will-change: opacity;
+    contain: strict;
+  }
+}
+
+@media (max-width: 380px) {
+  body .chat-container {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .theme-swatches {
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  }
+  body .welcome-title {
+    font-size: clamp(1.5rem, 8vw, 2rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body .chat-box .message {
+    animation: none !important;
+  }
+  .artifact-panel,
+  .gallery-panel,
+  .panel-scrim,
+  body .sidebar {
+    transition: none !important;
+  }
+}
