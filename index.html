@@ -401,9 +401,41 @@
             <p class="disclaimer">Nico OS may display inaccurate info. Verify system actions.</p>
         </div>
     </main>
+
+    <!-- Artifacts panel: a substantial reply renders live here instead of in the transcript -->
+    <button id="artifactToggle" class="artifact-toggle" type="button" hidden aria-label="Open last artifact">
+        <span aria-hidden="true">◧</span>
+    </button>
+    <aside id="artifactPanel" class="artifact-panel" hidden aria-hidden="true" aria-label="Artifact preview">
+        <div id="artifactResizer" class="artifact-resizer" role="separator" aria-orientation="vertical" aria-label="Resize artifact panel" tabindex="0"></div>
+        <div class="artifact-inner">
+            <header class="artifact-header">
+                <span class="artifact-icon" aria-hidden="true">◈</span>
+                <input id="artifactTitle" class="artifact-title" type="text" aria-label="Artifact title" spellcheck="false" />
+                <div id="artifactVersions" class="artifact-versions" aria-label="Artifact versions"></div>
+                <div class="artifact-actions">
+                    <button id="artifactCopy" class="artifact-btn" type="button">Copy</button>
+                    <button id="artifactDownload" class="artifact-btn" type="button">Download</button>
+                    <button id="artifactClose" class="artifact-btn artifact-close" type="button" aria-label="Close artifact panel">×</button>
+                </div>
+            </header>
+            <div id="artifactBody" class="artifact-body"></div>
+            <div id="artifactError" class="artifact-error" hidden>
+                <p>This preview could not be loaded.</p>
+                <div>
+                    <button id="artifactErrorOpen" class="artifact-btn" type="button">Open in new tab</button>
+                    <button id="artifactErrorDownload" class="artifact-btn" type="button">Download</button>
+                </div>
+            </div>
+            <footer class="artifact-footer">
+                <span id="artifactMeta" class="artifact-meta"></span>
+            </footer>
+        </div>
+    </aside>
 </div>
 
 <script src="script.js?v=fix30"></script>
+<script src="artifacts.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
 <script>
     if ("serviceWorker" in navigator) {

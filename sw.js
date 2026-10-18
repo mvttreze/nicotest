@@ -1,4 +1,4 @@
-const CACHE_NAME = "nico-shell-v8";
+const CACHE_NAME = "nico-shell-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const APP_SHELL = [
   "./nico-redesign.css",
   "./nico-ui.js",
   "./script.js",
+  "./artifacts.js",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",

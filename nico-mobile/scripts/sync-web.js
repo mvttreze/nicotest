@@ -13,6 +13,7 @@ const FILES = [
   "manifest.json",
   "sw.js",
   "script.js",
+  "artifacts.js",
   "nico-ui.js",
   "style.css",
   "nico-redesign.css",
