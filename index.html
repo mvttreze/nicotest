@@ -110,7 +110,7 @@
 
         <nav class="sidebar-quick" aria-label="Quick access">
             <button type="button" class="quick-link" data-quick="artifacts"><span class="quick-icon" data-icon="panel"></span><span>Artifacts</span><span class="quick-badge" id="quickArtifactCount" hidden>0</span></button>
-            <a href="#" class="quick-link" data-quick="gallery"><span class="quick-icon" data-icon="image"></span><span>Gallery</span></a>
+            <button type="button" class="quick-link" data-quick="gallery"><span class="quick-icon" data-icon="image"></span><span>Gallery</span><span class="quick-badge" id="quickGalleryCount" hidden>0</span></button>
             <a href="#" class="quick-link" data-quick="reminders"><span class="quick-icon" data-icon="bell"></span><span>Reminders</span><span class="quick-badge" id="quickReminderCount" hidden>0</span></a>
             <a href="#" class="quick-link" data-quick="projects"><span class="quick-icon" data-icon="document"></span><span>Projects</span></a>
         </nav>
@@ -449,11 +449,35 @@
             </div>
         </div>
     </aside>
+
+    <!-- Gallery: every image Nico generated, across every conversation -->
+    <aside id="galleryPanel" class="gallery-panel" hidden aria-hidden="true" aria-label="Image gallery">
+        <div id="galleryResizer" class="gallery-resizer" role="separator" aria-orientation="vertical" aria-label="Resize gallery" tabindex="0"></div>
+        <div class="gallery-inner">
+            <header class="gallery-header">
+                <span class="gallery-icon" aria-hidden="true">&#9638;</span>
+                <strong>Gallery</strong>
+                <span id="galleryCount" class="gallery-count"></span>
+                <button id="galleryClose" class="gallery-btn gallery-close" type="button" aria-label="Close gallery">&times;</button>
+            </header>
+            <div id="galleryGrid" class="gallery-grid"></div>
+            <div id="galleryViewer" class="gallery-viewer" hidden>
+                <img id="galleryViewerImg" class="gallery-viewer-img" alt="" />
+                <p id="galleryViewerCaption" class="gallery-viewer-caption"></p>
+                <div class="gallery-viewer-actions">
+                    <button id="galleryViewerClose" class="gallery-btn" type="button">Back</button>
+                    <button id="galleryDownload" class="gallery-btn" type="button">Download</button>
+                    <button id="galleryDelete" class="gallery-btn gallery-delete" type="button">Delete</button>
+                </div>
+            </div>
+        </div>
+    </aside>
 </div>
 
 <script src="script.js?v=fix30"></script>
 <script src="artifacts.js?v=fix31"></script>
 <script src="icons.js?v=fix31"></script>
+<script src="gallery.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
 <script>
     if ("serviceWorker" in navigator) {

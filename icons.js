@@ -124,7 +124,9 @@
     });
 
     wireQuickAccess();
+    // The other two panels own their own badges; refresh whichever loaded.
     if (window.NicoArtifacts) window.NicoArtifacts.refreshBadge();
+    if (window.NicoGallery) window.NicoGallery.refreshBadge();
     window.NicoIcons = { PATHS: PATHS, iconify: iconify };
   }
 
@@ -176,11 +178,15 @@
           }
           return;
         }
-        notify(
-          kind === "gallery"
-            ? "Gallery is coming next."
-            : "Projects are coming next."
-        );
+        if (kind === "gallery") {
+          if (window.NicoGallery && typeof window.NicoGallery.open === "function") {
+            window.NicoGallery.open();
+          } else {
+            notify("Gallery is still loading.");
+          }
+          return;
+        }
+        notify("Projects are coming next.");
       });
       }
     );
