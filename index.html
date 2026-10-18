@@ -357,8 +357,8 @@
             <div class="print-header" id="printHeader" aria-hidden="true"></div>
             <!-- Gemini-style Welcome Screen -->
             <div id="welcomeScreen" class="welcome-container">
-                <h1 class="welcome-title">Hello, <span id="welcomeName">User</span></h1>
-                <p class="welcome-subtitle">What should we focus on?</p>
+                <h1 class="welcome-title" id="welcomeTitle">Hello, <span class="welcome-name" id="welcomeName">User</span></h1>
+                <p class="welcome-subtitle" id="welcomeSubtitle">What should we focus on?</p>
                 <div class="welcome-suggestions">
                     <button type="button" data-prompt="Help me debug this code: ">Debug some code</button>
                     <button type="button" data-prompt="Explain this simply: ">Explain something</button>
@@ -495,6 +495,7 @@
 <script src="icons.js?v=fix31"></script>
 <script src="gallery.js?v=fix31"></script>
 <script src="settings-ui.js?v=fix31"></script>
+<script src="greetings.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
 <script>
     if ("serviceWorker" in navigator) {

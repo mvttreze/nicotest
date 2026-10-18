@@ -17,6 +17,7 @@ const FILES = [
   "icons.js",
   "gallery.js",
   "settings-ui.js",
+  "greetings.js",
   "nico-ui.js",
   "style.css",
   "nico-redesign.css",

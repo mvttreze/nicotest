@@ -2051,6 +2051,8 @@ function startNewChat() {
   currentConversationId = createConversationId();
   persistCurrentConversationId();
   clearChatBox();
+  // Fresh chat, fresh line. Ignore if the module did not load.
+  window.NicoGreetings?.reroll();
   loadRecentConversations();
   focusInput();
 }
@@ -4289,9 +4291,20 @@ async function loadMyBadges() {
   });
 }
 
+/* The welcome headline is owned by greetings.js, which picks a variation and
+   wraps the name in its own span. Fall back to the old plain-text behaviour
+   if that module ever fails to load, so the name always shows. */
+function setWelcomeGreeting(name, isDeveloper) {
+  if (window.NicoGreetings) {
+    window.NicoGreetings.apply(name, isDeveloper);
+    return;
+  }
+  const welcomeName = document.getElementById("welcomeName");
+  if (welcomeName) welcomeName.textContent = name;
+}
+
 function updateAuthUi(user) {
   const userName = document.getElementById("user-name");
-  const welcomeName = document.getElementById("welcomeName");
   const userAvatar = document.getElementById("user-avatar");
   const userStatus = document.getElementById("user-status");
   const signInButton = document.getElementById("sign-in-btn");
@@ -4307,7 +4320,7 @@ function updateAuthUi(user) {
     setAuthScreenVisible(true);
     authUiInitialized = false;
     userName.textContent = "Not signed in";
-    if (welcomeName) welcomeName.textContent = "User";
+    setWelcomeGreeting("User", false);
     userAvatar.textContent = "?";
     userStatus.textContent = "Guest mode - chats are not saved";
     signInButton.hidden = false;
@@ -4345,7 +4358,7 @@ function updateAuthUi(user) {
   const isDeveloper = isDeveloperAccountUser(user);
   const developerLabel = isDeveloper ? "Matt Andrei" : displayName;
   userName.textContent = isDeveloper ? "Matt Andrei" : displayName;
-  if (welcomeName) welcomeName.textContent = developerLabel;
+  setWelcomeGreeting(developerLabel, isDeveloper);
   userAvatar.textContent = isDeveloper
     ? "M"
     : displayName.charAt(0).toUpperCase();

@@ -193,6 +193,26 @@
     window.addEventListener("resize", syncIndicator);
     syncIndicator();
 
+    // This runs at load, when the panel is still display:none, so the first
+    // measurement is always 0. Re-measure the moment it is actually shown.
+    //
+    // Measured synchronously on purpose: requestAnimationFrame does not fire
+    // in a hidden or background tab, which would leave the indicator at 0.
+    // Reading offsetWidth here forces a fresh layout, so it is already
+    // correct even though the class was applied in the same tick.
+    var panelEl = document.getElementById("settingsPanel");
+    if (panelEl && typeof MutationObserver !== "undefined") {
+      var refresh = function () {
+        syncIndicator();
+        staggerActivePanel();
+      };
+      var openWatcher = new MutationObserver(function () {
+        if (panelEl.classList.contains("open")) refresh();
+      });
+      openWatcher.observe(panelEl, { attributes: true, attributeFilter: ["class"] });
+      if (panelEl.classList.contains("open")) refresh();
+    }
+
     // Panels animate in as they become visible.
     var observer = new MutationObserver(function () {
       staggerActivePanel();
