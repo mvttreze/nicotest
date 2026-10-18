@@ -9,6 +9,7 @@ const APP_SHELL = [
   "./artifacts.js",
   "./icons.js",
   "./gallery.js",
+  "./settings-ui.js",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",

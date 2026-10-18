@@ -55,7 +55,6 @@ const defaultSettings = {
   memoryText: "",
   context: true,
   sound: false,
-  avatar: "✦",
   customBackgroundImage: "",
   wake: false,
   briefCity: "",
@@ -223,11 +222,8 @@ function applySettings() {
   } else {
     document.body.style.removeProperty("--custom-background-image");
   }
-  const mascotLogo = document.getElementById("mascotLogo");
   const brandName = document.getElementById("brandName");
   const modelBadge = document.querySelector(".model-badge");
-  const mascotPreview = document.getElementById("mascotPreview");
-  if (mascotLogo) mascotLogo.textContent = settings.avatar;
   if (brandName) {
     brandName.textContent =
       settings.personality === "mica"
@@ -245,11 +241,6 @@ function applySettings() {
           : settings.personality === "developer"
             ? "Developer • Matt Andrei"
             : "Nico v2 • System OS";
-  if (mascotPreview)
-    mascotPreview.firstChild.textContent = `${settings.avatar} `;
-  document.querySelectorAll(".avatar-tag").forEach((tag) => {
-    tag.textContent = settings.avatar;
-  });
   const typingIndicator = document.getElementById("typingIndicator");
   if (typingIndicator) typingIndicator.innerText = getAssistantThinkingLabel();
   const customBackgroundStatus = document.getElementById(
@@ -1581,7 +1572,7 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
   currentAbortController = new AbortController();
   const assistantMsgDiv = document.createElement("div");
   assistantMsgDiv.className = "message assistant";
-  assistantMsgDiv.innerHTML = `<span class="avatar-tag">${settings.avatar}</span><div class="content"></div>`;
+  assistantMsgDiv.innerHTML = `<div class="content"></div>`;
   const contentDiv = assistantMsgDiv.querySelector(".content");
   contentDiv.style.visibility = "hidden";
   if (indicator) chatBox.insertBefore(assistantMsgDiv, indicator);
@@ -1979,8 +1970,7 @@ function appendMessage(role, text, attachments = [], msgId = null) {
   let footerText = text;
 
   if (role === "assistant") {
-    msgDiv.innerHTML = `<span class="avatar-tag"></span><div class="content">${renderMarkdown(text)}</div>`;
-    msgDiv.querySelector(".avatar-tag").textContent = settings.avatar;
+    msgDiv.innerHTML = `<div class="content">${renderMarkdown(text)}</div>`;
     attachCodeCopyButtons(msgDiv);
     appendAttachmentImages(msgDiv.querySelector(".content"), attachments);
     appendFileAttachmentCards(msgDiv.querySelector(".content"), attachments);
@@ -3768,7 +3758,7 @@ async function sendMessage() {
 
   const assistantMsgDiv = document.createElement("div");
   assistantMsgDiv.className = "message assistant";
-  assistantMsgDiv.innerHTML = `<span class="avatar-tag">${settings.avatar}</span><div class="content"></div>`;
+  assistantMsgDiv.innerHTML = `<div class="content"></div>`;
   const contentDiv = assistantMsgDiv.querySelector(".content");
   contentDiv.style.visibility = "hidden";
 
@@ -3986,7 +3976,7 @@ function handleCommand(commandText) {
 
   const assistantMsgDiv = document.createElement("div");
   assistantMsgDiv.className = "message assistant";
-  assistantMsgDiv.innerHTML = `<span class="avatar-tag">${settings.avatar}</span><div class="content"></div>`;
+  assistantMsgDiv.innerHTML = `<div class="content"></div>`;
   const contentDiv = assistantMsgDiv.querySelector(".content");
 
   if (
@@ -4124,7 +4114,6 @@ function initializeSettingsPanel() {
     memoryText: document.getElementById("memoryInput"),
     context: document.getElementById("contextSetting"),
     sound: document.getElementById("soundSetting"),
-    avatar: document.getElementById("avatarSetting"),
     wake: document.getElementById("wakeSetting"),
     briefCity: document.getElementById("briefCity"),
   };

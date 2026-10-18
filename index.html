@@ -214,8 +214,21 @@
                     </label>
                 </section>
                 <section class="settings-tab-panel" id="settings-appearance" role="tabpanel" hidden>
-                    <label class="setting-row">Theme
-                        <select id="themeSetting">
+                    <div class="setting-group">
+                        <div class="setting-group-head">
+                            <span>Theme</span>
+                            <small id="themeSettingLabel">Default</small>
+                        </div>
+                        <div class="theme-swatches" id="themeSwatches" role="radiogroup" aria-label="Theme">
+                            <button type="button" class="theme-swatch" data-theme="midnight" role="radio" aria-checked="true" aria-label="Default" style="--s1:#07050f;--s2:#140a26;--s3:#6ea8ff"><span></span><em>Default</em></button>
+                            <button type="button" class="theme-swatch" data-theme="cyberpunk" role="radio" aria-checked="false" aria-label="Cyberpunk neon" style="--s1:#0a0014;--s2:#2d0033;--s3:#ff2e9a"><span></span><em>Cyberpunk</em></button>
+                            <button type="button" class="theme-swatch" data-theme="sunset" role="radio" aria-checked="false" aria-label="Sunset orange" style="--s1:#1a0d06;--s2:#3d1a0a;--s3:#ff8a3d"><span></span><em>Sunset</em></button>
+                            <button type="button" class="theme-swatch" data-theme="aurora" role="radio" aria-checked="false" aria-label="Aurora glass" style="--s1:#04121a;--s2:#0b2e33;--s3:#5fd8c8"><span></span><em>Aurora</em></button>
+                            <button type="button" class="theme-swatch" data-theme="ocean" role="radio" aria-checked="false" aria-label="Deep ocean" style="--s1:#040d1c;--s2:#0a2140;--s3:#3d9bff"><span></span><em>Ocean</em></button>
+                            <button type="button" class="theme-swatch" data-theme="forest" role="radio" aria-checked="false" aria-label="Forest signal" style="--s1:#06120b;--s2:#12301c;--s3:#5fd37a"><span></span><em>Forest</em></button>
+                            <button type="button" class="theme-swatch" data-theme="graphite" role="radio" aria-checked="false" aria-label="Graphite studio" style="--s1:#141414;--s2:#242424;--s3:#b0b0b0"><span></span><em>Graphite</em></button>
+                        </div>
+                        <select id="themeSetting" class="visually-hidden" tabindex="-1" aria-hidden="true">
                             <option value="midnight">Default</option>
                             <option value="cyberpunk">Cyberpunk neon</option>
                             <option value="sunset">Sunset orange</option>
@@ -224,31 +237,34 @@
                             <option value="forest">Forest signal</option>
                             <option value="graphite">Graphite studio</option>
                         </select>
-                    </label>
-                    <label class="setting-row">Appearance
-                        <select id="modeSetting">
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-group-head"><span>Appearance</span></div>
+                        <div class="seg-control" id="modeSeg" role="radiogroup" aria-label="Appearance">
+                            <button type="button" class="seg-btn" data-mode="dark" role="radio" aria-checked="true">Dark</button>
+                            <button type="button" class="seg-btn" data-mode="light" role="radio" aria-checked="false">Light</button>
+                        </div>
+                        <select id="modeSetting" class="visually-hidden" tabindex="-1" aria-hidden="true">
                             <option value="dark">Dark</option>
                             <option value="light">Light</option>
                         </select>
-                    </label>
-                    <label class="setting-row">Font
-                        <select id="fontSetting">
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-group-head"><span>Font</span></div>
+                        <div class="seg-control" id="fontSeg" role="radiogroup" aria-label="Font">
+                            <button type="button" class="seg-btn is-sans" data-font="sans" role="radio" aria-checked="true">Sans</button>
+                            <button type="button" class="seg-btn is-mono" data-font="mono" role="radio" aria-checked="false">Mono</button>
+                        </div>
+                        <select id="fontSetting" class="visually-hidden" tabindex="-1" aria-hidden="true">
                             <option value="sans">Clean sans-serif</option>
                             <option value="mono">Monospace</option>
                         </select>
-                    </label>
-                    <label class="setting-row">Text size
+                    </div>
+                    <label class="setting-row setting-range">
+                        Text size
                         <input id="fontSizeSetting" type="range" min="90" max="120" step="5" value="100">
+                        <output class="range-value" id="fontSizeValue" for="fontSizeSetting">100%</output>
                     </label>
-                    <label class="setting-row">Mascot
-                        <select id="avatarSetting">
-                            <option value="✦">Spark</option>
-                            <option value="◈">Prism</option>
-                            <option value="✧">Star</option>
-                            <option value="●">Orb</option>
-                        </select>
-                    </label>
-                    <div class="mascot-preview" id="mascotPreview" aria-live="polite">✦ <span>Current mascot</span></div>
                     <div class="custom-theme-tools">
                         <div class="custom-theme-heading">
                             <span>Custom background</span>
@@ -478,6 +494,7 @@
 <script src="artifacts.js?v=fix31"></script>
 <script src="icons.js?v=fix31"></script>
 <script src="gallery.js?v=fix31"></script>
+<script src="settings-ui.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
 <script>
     if ("serviceWorker" in navigator) {
