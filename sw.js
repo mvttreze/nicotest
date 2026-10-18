@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./nico-ui.js",
   "./script.js",
   "./artifacts.js",
+  "./icons.js",
   "./manifest.json",
   "./icon.svg",
   "./icon-192.png",

@@ -108,6 +108,13 @@
             <span>+</span> New chat
         </button>
 
+        <nav class="sidebar-quick" aria-label="Quick access">
+            <a href="#" class="quick-link" data-quick="artifacts"><span class="quick-icon" data-icon="panel"></span><span>Artifacts</span></a>
+            <a href="#" class="quick-link" data-quick="gallery"><span class="quick-icon" data-icon="image"></span><span>Gallery</span></a>
+            <a href="#" class="quick-link" data-quick="reminders"><span class="quick-icon" data-icon="bell"></span><span>Reminders</span><span class="quick-badge" id="quickReminderCount" hidden>0</span></a>
+            <a href="#" class="quick-link" data-quick="projects"><span class="quick-icon" data-icon="document"></span><span>Projects</span></a>
+        </nav>
+
         <div class="sidebar-section">
             <p class="section-title">Recents</p>
             <div class="history-list" id="historyList"></div>
@@ -436,6 +443,7 @@
 
 <script src="script.js?v=fix30"></script>
 <script src="artifacts.js?v=fix31"></script>
+<script src="icons.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
 <script>
     if ("serviceWorker" in navigator) {

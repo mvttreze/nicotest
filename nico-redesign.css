@@ -69,7 +69,7 @@ body .auth-primary-btn{background:var(--grad);color:#fff;border-radius:var(--r-m
 
 /* old rules forced the chat area to near-full height and pushed the composer off-screen */
 body .app-layout .chat-container{min-height:0!important}
-body .welcome-title span{background:none!important;-webkit-text-fill-color:transparent;font:inherit;letter-spacing:inherit}
+body .welcome-title span{background:none!important;-webkit-text-fill-color:currentColor;font:inherit;letter-spacing:inherit;color:inherit}
 
 /* =================== v2 polish =================== */
 *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--accent) 45%,transparent) transparent}
@@ -592,6 +592,19 @@ body .welcome-title {
   -webkit-text-fill-color: currentColor;
   -webkit-background-clip: initial;
   background-clip: initial;
+  /* The legacy gradient-text animation left the user's name unreadable. */
+  animation: none;
+  text-shadow: none;
+  transform: none;
+  will-change: auto;
+}
+body .welcome-title span {
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: inherit !important;
+  animation: none !important;
+  opacity: 1 !important;
+  filter: none !important;
 }
 body .welcome-subtitle { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.4rem; }
 body .welcome-suggestions { gap: 8px; margin-top: 1.4rem; }
@@ -1483,4 +1496,85 @@ html.artifacts-open body .input-wrapper { max-width: 760px; }
 @media (prefers-reduced-motion: reduce) {
   .artifact-panel,
   .artifact-toggle { transition: none; }
+}
+
+/* ================================================================
+   CLAUDE WEB REDESIGN - PART F: icons + quick access
+   ================================================================ */
+
+/* Inline SVG icons that replaced the emoji */
+.ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+.ico svg { width: 16px; height: 16px; display: block; }
+.dropdown-icon .ico svg,
+.quick-icon .ico svg { width: 15px; height: 15px; }
+
+/* Buttons that held an emoji now align an icon */
+body .settings-btn .ico svg,
+body .mobile-menu-btn .ico svg,
+body .icon-btn .ico svg { width: 17px; height: 17px; }
+body .export-btn .ico { margin-right: 5px; }
+.drop-overlay-icon .ico svg { width: 26px; height: 26px; }
+.vision-control.primary .ico { margin-right: 6px; }
+.vision-control.primary .ico svg { width: 14px; height: 14px; }
+
+/* ---------- Sidebar quick access (above Recents) ---------- */
+.sidebar-quick {
+  display: grid;
+  gap: 1px;
+  padding: 2px 0 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.quick-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0.44rem 0.6rem;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font: 500 0.82rem var(--ui);
+  text-decoration: none;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.quick-link:hover { background: var(--panel); color: var(--text-primary); }
+.quick-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.quick-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  color: var(--text-faint);
+  transition: color 0.14s ease;
+}
+.quick-link:hover .quick-icon { color: var(--accent); }
+.quick-link > span:nth-child(2) {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.quick-badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  font: 700 0.62rem var(--ui);
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+}
+.quick-badge[hidden] { display: none; }
+
+@media (max-width: 900px) {
+  .sidebar-quick { padding-bottom: 8px; }
 }

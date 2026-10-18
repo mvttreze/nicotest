@@ -3065,8 +3065,12 @@ function maybeResumeWake() {
 const IMAGINE_NOUNS = "images?|pictures?|photos?|photographs?|drawings?|paintings?|portraits?|sketches?|illustrations?|artworks?|art|logos?|wallpapers?|avatars?|icons?|posters?|comics?|memes?|doodles?";
 const IMAGINE_VERBS = "draw|paint|sketch|imagine|generate|create|make|give|produce|render|design|show";
 const IMAGINE_SOLO_VERBS = "draw|paint|sketch|imagine";
-const DOC_NOUNS = "pdfs?|docx?|docs?|documents?|reports?|files?|letters?|essays?|resumes?|articles?|stories?|poems?";
+const DOC_NOUNS = "pdfs?|docx?|docs?|documents?|reports?|letters?|essays?|resumes?|articles?|stories?|poems?";
 const DOC_VERBS = "generate|create|write|make|draft|compose|produce|prepare|build";
+// Words that mean "a real deliverable document", not an adjective inside a
+// phrase. "single-file HTML", "profile", "config file" must NOT become a PDF.
+const DOC_NOUN_CONTEXT_BLOCKERS =
+  /\b(single[\s-]?file|multi[\s-]?file|config|profile|json|yaml|toml|csv|html|css|jsx|tsx|svg|markdown|source|code|repo|script|app|project|component|layout|template|stylesheet|webpage|web\s?page|landing\s?page|dashboard|image|photo|picture|icon|logo)\b/i;
 const QUESTION_STARTERS = "how|what|why|when|where|which|who|explain|define|describe|tell me|talk about|meaning of";
 
 function stripPoliteness(s) {
@@ -3122,12 +3126,17 @@ function matchImagineIntent(raw) {
 function matchDocIntent(raw) {
   const text = stripPoliteness(raw);
   if (!text || isQuestion(text)) return null;
+  // Code/UI/media work is never a "document", even when it mentions a file.
+  if (DOC_NOUN_CONTEXT_BLOCKERS.test(text)) return null;
+  // Require an explicit deliverable: "pdf", "docx", or a word like essay/letter.
+  const fmt = text.match(/\b(pdf|docx|word\s?document)\b/i);
+  const deliverable = fmt || /\b(essays?|resumes?|articles?|stories?|poems?|letters?|reports?|documents?)\b/i.test(text);
+  if (!deliverable) return null;
   const hasNoun = new RegExp(`\\b(${DOC_NOUNS})\\b`, "i").test(text);
   const hasVerb = new RegExp(`\\b(${DOC_VERBS})\\b`, "i").test(text);
   if (!hasNoun || !hasVerb) return null;
-  const fmt = text.match(/\b(pdf|docx)\b/i);
   const wordish = /\b(words?|docs?|resumes?|letters?)\b/i.test(text);
-  const kind = fmt ? fmt[1].toLowerCase().replace(/^doc$/, "docx") : wordish ? "docx" : "pdf";
+  const kind = fmt ? fmt[1].toLowerCase().replace(/^word document/, "docx").replace(/^word$/, "docx") : wordish ? "docx" : "pdf";
   let topic = text.replace(
     new RegExp(`^.*?\\b(?:${DOC_NOUNS})\\b\\s*(?:about|on|of|for)?\\s*`, "i"),
     "",
@@ -3523,6 +3532,9 @@ async function handleGenerateDoc(kind, topic, display) {
         },
       ]);
     }
+    // A generated document is a real exchange: refresh Recents so the chat shows
+    // up in the sidebar immediately instead of only after a reload.
+    loadRecentConversations();
   } catch {
     appendMessage("assistant", "I couldn't build that file — try again.", []);
   } finally {
@@ -3616,6 +3628,9 @@ async function handleImagine(prompt, display) {
         imagineAttachments,
       );
     }
+    // Generated images are a real exchange: refresh Recents so the chat appears
+    // in the sidebar immediately instead of only after a reload.
+    loadRecentConversations();
   } catch (error) {
     const reason = error?.message && error.message !== "render failed"
       ? ` (${String(error.message).slice(0, 200)})`
