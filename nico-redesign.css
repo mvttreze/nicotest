@@ -993,3 +993,161 @@ body .settings-panel textarea {
 
 /* ---------- Accessibility ---------- */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ================================================================
+   CLAUDE WEB REDESIGN - PART C: refinement pass
+   Fixes a cramped send button, then refines typography, rhythm,
+   density, states and detail.
+   ================================================================ */
+
+/* ---------- Fix: send button was a 34px circle holding a word ---------- */
+body .send-btn {
+  width: auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 0.85rem;
+  border-radius: 999px;
+  font: 500 0.78rem var(--ui);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+body .send-btn:disabled { opacity: 0.45; }
+
+/* ---------- Typography refinement ---------- */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.003em;
+}
+
+body .message.assistant .content {
+  font-size: 0.97rem;
+  line-height: 1.72;
+  letter-spacing: -0.002em;
+  overflow-wrap: anywhere;
+}
+body .message.user .content {
+  font-size: 0.93rem;
+  line-height: 1.62;
+}
+
+body .message .content h1 { font-size: 1.5rem; margin: 1.5rem 0 0.55rem; letter-spacing: -0.015em; }
+body .message .content h2 { font-size: 1.22rem; margin: 1.35rem 0 0.45rem; letter-spacing: -0.012em; }
+body .message .content h3 { font-size: 1.04rem; margin: 1.15rem 0 0.4rem; font-family: var(--ui); font-weight: 600; letter-spacing: -0.005em; }
+body .message .content h1:first-child,
+body .message .content h2:first-child,
+body .message .content h3:first-child { margin-top: 0; }
+body .message .content p { margin: 0.15rem 0 0.85rem; }
+body .message .content strong { font-weight: 600; }
+body .message .content ul,
+body .message .content ol { padding-left: 1.15rem; margin: 0.4rem 0 0.9rem; }
+body .message .content li { margin: 0.22rem 0; }
+body .message .content hr { border: 0; border-top: 1px solid var(--line); margin: 1.5rem 0; }
+
+/* ---------- Message rhythm ---------- */
+body .chat-box { gap: 30px; }
+body .message.user { padding: 0.6rem 0.9rem; }
+body .msg-actions { margin-top: 4px; }
+
+/* ---------- Welcome refinement ---------- */
+body .welcome-title { font-size: clamp(2.1rem, 4vw, 2.75rem); letter-spacing: -0.022em; }
+body .welcome-subtitle { font-size: 0.92rem; color: var(--text-faint); margin-top: 0.3rem; }
+body .welcome-suggestions { gap: 7px; margin-top: 1.6rem; }
+body .welcome-suggestions button {
+  font-size: 0.82rem;
+  padding: 0.42rem 0.85rem;
+  color: var(--text-muted);
+  background: transparent;
+  border-color: var(--line);
+}
+body .welcome-suggestions button:hover { color: var(--text-primary); border-color: var(--accent); background: var(--bg-accent); }
+
+/* ---------- Sidebar refinement ---------- */
+body .sidebar { padding: 16px 12px 12px; }
+body .sidebar-section { padding-top: 2px; }
+body .history-list > *,
+body #recent-chats > * {
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.45;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+body .history-list > *.active,
+body #recent-chats > *.active { font-weight: 500; color: var(--text-primary); }
+body .history-list > *.active::before,
+body #recent-chats > *.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 55%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+body .history-list > *:hover,
+body #recent-chats > *:hover { background: var(--panel); }
+body .new-chat-btn { font-size: 0.85rem; padding: 0.55rem 0.7rem; }
+body .user-profile-row { border-top: 0; padding-top: 2px; }
+body .user-info { min-width: 0; }
+body .user-name,
+body .status-online { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Composer refinement ---------- */
+body .input-pill { border-radius: var(--r-lg); padding: 0.45rem 0.5rem; transition: border-color 0.16s ease; }
+body .input-pill textarea { padding: 7px 6px; }
+body .input-pill textarea::placeholder { color: var(--text-faint); font-size: 0.92rem; }
+body .add-btn { transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease; }
+body .micBtn, body #micBtn { border-radius: 50%; }
+
+/* ---------- Code block refinement ---------- */
+body .code-container { position: relative; }
+body .code-container::before {
+  top: 10px;
+  left: 14px;
+  font-size: 0.62rem;
+  color: var(--text-faint);
+}
+body .message pre code { line-height: 1.7; font-size: 0.815rem; }
+body .code-container pre { padding-top: 2.5rem; }
+
+/* ---------- Scrollbar ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
+
+/* ---------- Selection + focus ---------- */
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text-primary); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
+
+/* ---------- Motion ---------- */
+body .message.assistant { animation: msgFade 0.26s ease both; }
+body .message.user { animation: msgFade 0.22s ease both; }
+@keyframes msgFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  body .message.assistant,
+  body .message.user { animation: none; }
+  body .history-list > *,
+  body #recent-chats > *,
+  body .input-pill,
+  body .add-btn { transition: none; }
+}
+
+/* ---------- Reduced density on small screens ---------- */
+@media (max-width: 600px) {
+  body .chat-box { gap: 24px; padding: 10px 14px 20px; }
+  body .message.assistant .content { font-size: 0.95rem; }
+  body .welcome-title { font-size: 1.85rem; letter-spacing: -0.02em; }
+  body .welcome-suggestions { gap: 6px; }
+}
