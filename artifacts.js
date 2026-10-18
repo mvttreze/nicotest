@@ -27,7 +27,34 @@
   var panel, body, titleEl, versionsEl, metaEl, errorEl, resizer, toggleBtn;
   var store = {};
   var openKey = null;
+  var lastConversation = null;
   var booted = false;
+
+  /* ------------------------------------------------------ conversation scope */
+
+  // Artifacts belong to the conversation that produced them. currentConversationId
+  // is a top-level binding in script.js, shared across classic scripts.
+  function currentConversation() {
+    try {
+      if (typeof currentConversationId !== "undefined" && currentConversationId) {
+        return String(currentConversationId);
+      }
+    } catch (error) {
+      /* not loaded yet */
+    }
+    return "default";
+  }
+
+  function scopedKey(type, title) {
+    return currentConversation() + "::" + type + "::" + title.toLowerCase().trim();
+  }
+
+  function keysInCurrentConversation() {
+    var prefix = currentConversation() + "::";
+    return Object.keys(store).filter(function (key) {
+      return key.indexOf(prefix) === 0;
+    });
+  }
 
   /* ---------------------------------------------------------------- store */
 
@@ -125,7 +152,7 @@
       if (!isSubstantial(code)) return;
 
       var title = titleFor(type, code);
-      var key = type + "::" + title.toLowerCase().trim();
+      var key = scopedKey(type, title);
 
       addVersion(key, { type: type, title: title, code: code });
 
@@ -346,7 +373,7 @@
     document.getElementById("artifactErrorOpen").addEventListener("click", openInNewTab);
     document.getElementById("artifactErrorDownload").addEventListener("click", downloadArtifact);
     toggleBtn.addEventListener("click", function () {
-      var keys = Object.keys(store);
+      var keys = keysInCurrentConversation();
       if (keys.length) openArtifact(keys[keys.length - 1]);
     });
 
@@ -378,9 +405,18 @@
       try { resizer.releasePointerCapture(event.pointerId); } catch (error) { /* ignore */ }
     });
 
+    lastConversation = currentConversation();
+
     var chatBox = document.getElementById("chatBox");
     if (chatBox && window.MutationObserver) {
       var observer = new MutationObserver(function (mutations) {
+        // Switching chats clears the transcript: drop a panel showing another
+        // conversation's artifact rather than leaving it stranded.
+        var now = currentConversation();
+        if (now !== lastConversation) {
+          lastConversation = now;
+          if (panel && panel.classList.contains("is-open")) hidePanel();
+        }
         mutations.forEach(function (mutation) {
           Array.prototype.forEach.call(mutation.addedNodes, function (node) {
             if (node.nodeType !== 1) return;
@@ -420,6 +456,7 @@
   window.NicoArtifacts = {
     open: openArtifact,
     close: hidePanel,
-    list: function () { return Object.keys(store); },
+    list: function () { return keysInCurrentConversation(); },
+    conversation: currentConversation,
   };
 })();
