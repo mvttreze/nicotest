@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <script>
@@ -63,7 +63,7 @@
                     aria-pressed="false"
                     title="Show password"
                 >
-                    <span aria-hidden="true">ðŸ‘</span>
+                    <span aria-hidden="true">👁</span>
                 </button>
             </div>
 
@@ -78,7 +78,7 @@
         </button>
 
         <button class="auth-provider-btn" id="authAppleBtn" type="button">
-            <span class="provider-mark apple">ï£¿</span>
+            <span class="provider-mark apple"></span>
             Continue with Apple
         </button>
 
@@ -127,7 +127,7 @@
                         </div>
                     </div>
                 </div>
-                <button id="settingsBtn" class="settings-btn" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settingsPanel" title="Settings">âš™</button>
+                <button id="settingsBtn" class="settings-btn" type="button" aria-label="Open settings" aria-expanded="false" aria-controls="settingsPanel" title="Settings">⚙</button>
             </div>
         </div>
     </aside>
@@ -136,19 +136,19 @@
     <main class="main-content">
         <div class="announce-banner" id="announceBanner" role="status" hidden></div>
         <header class="top-header">
-            <button class="mobile-menu-btn" id="menu-toggle" type="button" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">â˜°</button>
+            <button class="mobile-menu-btn" id="menu-toggle" type="button" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button>
             <div class="top-header-actions">
-                <button id="reminderBtn" class="icon-btn reminder-btn" type="button" aria-label="Reminders" aria-expanded="false" aria-controls="reminderDropdown" title="Reminders">ðŸ””<span id="reminderBadge" class="reminder-badge" hidden>0</span></button>
+                <button id="reminderBtn" class="icon-btn reminder-btn" type="button" aria-label="Reminders" aria-expanded="false" aria-controls="reminderDropdown" title="Reminders">🔔<span id="reminderBadge" class="reminder-badge" hidden>0</span></button>
                 <button id="exportBtn" class="export-btn" type="button" aria-expanded="false" aria-controls="exportDropdown" title="Export options">
-                    â¬‡ Export
+                    ⬇ Export
                 </button>
-                <span class="model-badge">Nico v2 â€¢ System OS</span>
+                <span class="model-badge">Nico v2 • System OS</span>
             </div>
             <div class="reminder-dropdown" id="reminderDropdown" aria-hidden="true"></div>
             <div class="export-dropdown" id="exportDropdown" aria-hidden="true" role="menu" aria-label="Export chat">
                 <p class="composer-menu-heading">Export chat</p>
                 <button class="dropdown-item" id="exportMdBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">ðŸ“</span>
+                    <span class="dropdown-icon" aria-hidden="true">📝</span>
                     <span class="dropdown-text"><span class="dropdown-title">Markdown</span><span class="dropdown-sub">Plain .md file</span></span>
                 </button>
                 <button class="dropdown-item" id="exportJsonBtn" type="button" role="menuitem">
@@ -156,11 +156,11 @@
                     <span class="dropdown-text"><span class="dropdown-title">JSON</span><span class="dropdown-sub">Raw messages</span></span>
                 </button>
                 <button class="dropdown-item" id="exportPdfBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">ðŸ–¨ï¸</span>
+                    <span class="dropdown-icon" aria-hidden="true">🖨️</span>
                     <span class="dropdown-text"><span class="dropdown-title">PDF</span><span class="dropdown-sub">Print / save as PDF</span></span>
                 </button>
                 <button class="dropdown-item" id="exportDocxBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">ðŸ“„</span>
+                    <span class="dropdown-icon" aria-hidden="true">📄</span>
                     <span class="dropdown-text"><span class="dropdown-title">Word</span><span class="dropdown-sub">.docx document</span></span>
                 </button>
             </div>
@@ -172,7 +172,7 @@
                     <strong>Nico settings</strong>
                     <span>Personalize your workspace</span>
                 </div>
-                <button id="closeSettingsBtn" class="settings-close" type="button" aria-label="Close settings">Ã—</button>
+                <button id="closeSettingsBtn" class="settings-close" type="button" aria-label="Close settings">×</button>
             </div>
             <div class="settings-tabs" role="tablist" aria-label="Settings sections">
                 <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="settings-personality" data-settings-tab="settings-personality">Personality</button>
@@ -235,13 +235,13 @@
                     </label>
                     <label class="setting-row">Mascot
                         <select id="avatarSetting">
-                            <option value="âœ¦">Spark</option>
-                            <option value="â—ˆ">Prism</option>
-                            <option value="âœ§">Star</option>
-                            <option value="â—">Orb</option>
+                            <option value="✦">Spark</option>
+                            <option value="◈">Prism</option>
+                            <option value="✧">Star</option>
+                            <option value="●">Orb</option>
                         </select>
                     </label>
-                    <div class="mascot-preview" id="mascotPreview" aria-live="polite">âœ¦ <span>Current mascot</span></div>
+                    <div class="mascot-preview" id="mascotPreview" aria-live="polite">✦ <span>Current mascot</span></div>
                     <div class="custom-theme-tools">
                         <div class="custom-theme-heading">
                             <span>Custom background</span>
@@ -259,7 +259,7 @@
                     <textarea id="memoryInput" class="memory-input" rows="2" placeholder="Facts Nico should remember about you"></textarea>
                     <label class="setting-toggle"><span>Use chat context</span><input id="contextSetting" type="checkbox" checked></label>
                     <label class="setting-toggle"><span>Sound effects</span><input id="soundSetting" type="checkbox"></label>
-                    <label class="setting-toggle"><span>Wake word (â€œHey Nicoâ€)</span><input id="wakeSetting" type="checkbox"></label>
+                    <label class="setting-toggle"><span>Wake word (“Hey Nico”)</span><input id="wakeSetting" type="checkbox"></label>
                     <label class="setting-row">Briefing city
                         <input id="briefCity" type="text" placeholder="e.g. Manila" autocomplete="off">
                     </label>
@@ -273,7 +273,7 @@
                 </section>
                 <section class="settings-tab-panel" id="settings-vision" role="tabpanel" hidden>
                     <div class="vision-settings-intro">
-                        <span class="vision-orb">â—‰</span>
+                        <span class="vision-orb">◉</span>
                         <div><strong>Let Nico see your screen</strong><small>Capture only when you choose. Nothing is watched in the background.</small></div>
                     </div>
                     <button id="openVisionBtn" class="vision-launch-btn" type="button">Open screen reader</button>
@@ -297,7 +297,7 @@
             <div class="vision-frame">
                 <div class="vision-header">
                     <div class="vision-title"><span class="vision-live-dot"></span><div><strong>Nico is watching</strong><small id="visionStatus">Screen sharing is active</small></div></div>
-                    <button id="closeVisionBtn" class="vision-close" type="button" aria-label="Stop screen reader">Ã—</button>
+                    <button id="closeVisionBtn" class="vision-close" type="button" aria-label="Stop screen reader">×</button>
                 </div>
                 <div class="vision-body">
                     <div class="vision-preview-wrap">
@@ -306,9 +306,9 @@
                         <div class="vision-corner corner-top-left"></div><div class="vision-corner corner-top-right"></div><div class="vision-corner corner-bottom-left"></div><div class="vision-corner corner-bottom-right"></div>
                     </div>
                     <aside class="vision-controls" aria-label="Screen sharing controls">
-                        <div class="vision-control-heading"><span class="vision-control-icon">â—‰</span><strong>Live view</strong><small>Share controls</small></div>
-                        <button id="captureVisionBtn" class="vision-control secondary" type="button" disabled><span>â—Œ</span>Capture frame</button>
-                        <button id="analyzeVisionBtn" class="vision-control primary" type="button" disabled><span>âœ¦</span>Ask Nico</button>
+                        <div class="vision-control-heading"><span class="vision-control-icon">◉</span><strong>Live view</strong><small>Share controls</small></div>
+                        <button id="captureVisionBtn" class="vision-control secondary" type="button" disabled><span>◌</span>Capture frame</button>
+                        <button id="analyzeVisionBtn" class="vision-control primary" type="button" disabled><span>✦</span>Ask Nico</button>
                         <button id="stopVisionBtn" class="vision-control stop" type="button">Stop sharing</button>
                         <label class="vision-auto-toggle"><input id="visionAutoAnalyze" type="checkbox"><span><strong>Auto-analyze on switch</strong><small>Capture and ask when you leave this tab.</small></span></label>
                         <p class="vision-note">Your screen is sent only when you capture or analyze a frame.</p>
@@ -323,7 +323,7 @@
                     <p class="admin-dashboard-eyebrow">Nico dashboard</p>
                     <h2>Developer overview</h2>
                 </div>
-                <button id="closeAdminDashboardBtn" class="admin-close-btn" type="button" aria-label="Close dashboard">Ã—</button>
+                <button id="closeAdminDashboardBtn" class="admin-close-btn" type="button" aria-label="Close dashboard">×</button>
             </div>
             <div id="adminDashboardContent" class="admin-dashboard-content">
                 <div class="admin-loading">Loading system status...</div>
@@ -366,7 +366,7 @@
                 </div>
                 <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
                     <div class="drop-overlay-inner">
-                        <span class="drop-overlay-icon">ðŸ–¼ï¸</span>
+                        <span class="drop-overlay-icon">🖼️</span>
                         <strong>Drop images to attach</strong>
                         <small>or paste with Ctrl+V</small>
                     </div>
@@ -378,19 +378,19 @@
             <div class="add-files-dropdown" id="addFilesDropdown" aria-hidden="true" role="menu" aria-label="Add files">
                 <p class="composer-menu-heading">Add to chat</p>
                 <button class="dropdown-item" id="addFilesBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">ðŸ“„</span>
+                    <span class="dropdown-icon" aria-hidden="true">📄</span>
                     <span class="dropdown-text"><span class="dropdown-title">Upload files</span><span class="dropdown-sub">Documents, PDFs, text</span></span>
                 </button>
                 <button class="dropdown-item" id="addImagesBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">ðŸ–¼ï¸</span>
+                    <span class="dropdown-icon" aria-hidden="true">🖼️</span>
                     <span class="dropdown-text"><span class="dropdown-title">Add photos</span><span class="dropdown-sub">JPG, PNG, GIF, WebP</span></span>
                 </button>
                 <button class="dropdown-item" id="pasteImageBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">ðŸ“‹</span>
+                    <span class="dropdown-icon" aria-hidden="true">📋</span>
                     <span class="dropdown-text"><span class="dropdown-title">Paste from clipboard</span><span class="dropdown-sub">Ctrl+V anywhere in chat</span></span>
                 </button>
                 <button class="dropdown-item" id="addCodeBtn" type="button" role="menuitem">
-                    <span class="dropdown-icon" aria-hidden="true">âŒ¨ï¸</span>
+                    <span class="dropdown-icon" aria-hidden="true">⌨️</span>
                     <span class="dropdown-text"><span class="dropdown-title">Add code</span><span class="dropdown-sub">Source files &amp; snippets</span></span>
                 </button>
                 <p class="dropdown-hint">Tip: screenshot then Ctrl+V to attach instantly</p>
