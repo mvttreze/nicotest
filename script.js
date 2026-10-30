@@ -4244,6 +4244,93 @@ function finishDemoSignIn(username, token = null) {
   updateAuthUi(demoUser);
 }
 
+/* ========================================================================
+   Guest access
+
+   Guest users can chat without signing in. The backend already accepts
+   unauthenticated POST /chat/stream (is_guest = user is None). This module
+   handles the frontend side:
+
+   - "Continue as guest" button on the auth screen
+   - Per-device quota tracked in localStorage (daily reset)
+   - Non-blocking sign-in prompts that nudge without interrupting
+   ======================================================================== */
+
+const GUEST_QUOTA_KEY = "nico_guest_quota";
+const GUEST_DAILY_LIMIT = 5;
+let guestPromptDismissed = false;
+
+function getDeviceId() {
+  let id = localStorage.getItem("nico_device_id");
+  if (!id) {
+    id = "dev-" + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+    try { localStorage.setItem("nico_device_id", id); } catch {}
+  }
+  return id;
+}
+
+function readGuestQuota() {
+  try {
+    const data = JSON.parse(localStorage.getItem(GUEST_QUOTA_KEY) || "{}");
+    const today = new Date().toDateString();
+    if (data.day === today) return { count: data.count || 0 };
+    return { count: 0 };
+  } catch {
+    return { count: 0 };
+  }
+}
+
+function incrementGuestQuota() {
+  const quota = readGuestQuota();
+  quota.count += 1;
+  try {
+    localStorage.setItem(GUEST_QUOTA_KEY, JSON.stringify({ count: quota.count, day: new Date().toDateString() }));
+  } catch {}
+  return quota.count;
+}
+
+function showGuestSignInPrompt(force) {
+  const prompt = document.getElementById("guestPrompt");
+  if (!prompt || guestPromptDismissed && !force) return;
+  prompt.classList.remove("hidden");
+}
+
+function hideGuestSignInPrompt() {
+  const prompt = document.getElementById("guestPrompt");
+  if (prompt) prompt.classList.add("hidden");
+  guestPromptDismissed = true;
+}
+
+function signInAsGuest() {
+  // Clear any existing session so apiFetch sends no Authorization header -
+  // the backend then treats the request as a guest (is_guest = true).
+  localStorage.removeItem("nico_demo_auth_token");
+  localStorage.removeItem("nico_demo_user");
+
+  const deviceId = getDeviceId();
+  const guestUser = {
+    id: "guest-" + deviceId,
+    is_guest: true,
+    email: null,
+    user_metadata: { full_name: "Guest", name: "Guest" },
+  };
+
+  currentUser = guestUser;
+  updateAuthUi(guestUser);
+
+  // Track this conversation against the per-device quota.
+  const used = incrementGuestQuota();
+  if (used >= GUEST_DAILY_LIMIT) {
+    showGuestSignInPrompt(true);
+  } else {
+    showGuestSignInPrompt(false);
+  }
+}
+
+function isGuestUser() {
+  return currentUser && currentUser.is_guest === true;
+}
+
 function isDeveloperAccountUser(user) {
   if (!user) return false;
   const email = (user.email || "").toLowerCase();
@@ -4314,6 +4401,7 @@ function updateAuthUi(user) {
 
   appLayout?.classList.toggle("guest-mode", !user);
   appLayout?.classList.toggle("logged-in-mode", !!user);
+  appLayout?.classList.toggle("is-guest", user?.is_guest);
 
   currentUser = user;
   if (!user) {
@@ -5176,6 +5264,18 @@ document.getElementById("sign-out-btn")?.addEventListener("click", async () => {
   localStorage.removeItem("nico_demo_user");
   updateAuthUi(null);
 });
+document
+  .getElementById("continueAsGuestBtn")
+  ?.addEventListener("click", signInAsGuest);
+document
+  .getElementById("guest-prompt-signin")
+  ?.addEventListener("click", () => {
+    hideGuestSignInPrompt();
+    updateAuthUi(null);
+  });
+document
+  .getElementById("guest-prompt-dismiss")
+  ?.addEventListener("click", hideGuestSignInPrompt);
 document
   .getElementById("openAdminDashboardBtn")
   ?.addEventListener("click", openDeveloperDashboard);

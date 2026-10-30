@@ -82,6 +82,16 @@
             Continue with Apple
         </button>
 
+        <div class="auth-divider"><span>or</span></div>
+
+        <button class="auth-btn guest-btn" id="continueAsGuestBtn" type="button">
+            <svg class="guest-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M8 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
+                <path d="M3 10h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2z"/>
+            </svg>
+            Continue as guest
+        </button>
+
         <div class="auth-footer">
             <span>New to Nico? <a id="createAccountLink" href="#">Create an account</a></span>
         </div>
@@ -367,7 +377,12 @@
                     <button type="button" data-prompt="Briefing">Morning briefing</button>
                 </div>
             </div>
-            
+
+            <div class="guest-prompt hidden" id="guestPrompt" aria-live="polite">
+                <span class="guest-prompt-text">Chats aren't saved as a guest. <button class="guest-prompt-signin" type="button">Sign in</button> to keep your history.</span>
+                <button class="guest-prompt-dismiss" type="button" aria-label="Dismiss">×</button>
+            </div>
+
             <div class="chat-box" id="chatBox">
                 <div id="typingIndicator" class="message assistant thinking-indicator" aria-hidden="true" style="display:none">Nico is thinking...</div>
             </div>
