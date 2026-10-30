@@ -4404,6 +4404,8 @@ function updateAuthUi(user) {
   appLayout?.classList.toggle("is-guest", user?.is_guest);
 
   currentUser = user;
+  // Reload the gallery so it shows the correct user's images on a shared device.
+  window.NicoGallery?.reload();
   if (!user) {
     setAuthScreenVisible(true);
     authUiInitialized = false;

@@ -14,7 +14,7 @@
 (function () {
   "use strict";
 
-  var STORE_KEY = "nico_gallery_v1";
+  var STORE_KEY_BASE = "nico_gallery_v1";
   var MAX_ITEMS = 120;
   var THUMB_MAX = 512;
 
@@ -24,9 +24,29 @@
 
   /* ------------------------------------------------------------- utilities */
 
+  /* Scope the gallery store to the current user/device so a guest never sees
+     a signed-in user's images (and vice versa) on a shared device. */
+  function storeKey() {
+    if (typeof currentUser !== "undefined" && currentUser) {
+      if (currentUser.is_guest) {
+        var deviceId = typeof getDeviceId === "function" ? getDeviceId() : "guest";
+        return STORE_KEY_BASE + ":guest:" + deviceId;
+      }
+      return STORE_KEY_BASE + ":user:" + currentUser.id;
+    }
+    var fallbackId = typeof getDeviceId === "function" ? getDeviceId() : "guest";
+    return STORE_KEY_BASE + ":guest:" + fallbackId;
+  }
+
+  function reload() {
+    items = load();
+    renderGrid();
+    refreshBadge();
+  }
+
   function load() {
     try {
-      var raw = localStorage.getItem(STORE_KEY);
+      var raw = localStorage.getItem(storeKey());
       var parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
@@ -36,18 +56,18 @@
 
   function save() {
     if (typeof storageSet === "function") {
-      if (storageSet(STORE_KEY, JSON.stringify(items))) return;
+      if (storageSet(storeKey(), JSON.stringify(items))) return;
     }
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(items));
+      localStorage.setItem(storeKey(), JSON.stringify(items));
     } catch (error) {
       // Out of room: drop the oldest half and try once more.
       items = items.slice(0, Math.floor(items.length / 2));
       try {
-        localStorage.setItem(STORE_KEY, JSON.stringify(items));
+        localStorage.setItem(storeKey(), JSON.stringify(items));
       } catch (retry) {
         items = items.slice(0, 6);
-        try { localStorage.setItem(STORE_KEY, JSON.stringify(items)); } catch (e) { /* give up */ }
+        try { localStorage.setItem(storeKey(), JSON.stringify(items)); } catch (e) { /* give up */ }
       }
     }
   }
@@ -349,7 +369,7 @@
     viewer = document.getElementById("galleryViewer");
     viewerImg = document.getElementById("galleryViewerImg");
     viewerCaption = document.getElementById("galleryViewerCaption");
-    items = load();
+    reload();
     wire();
     refreshBadge();
     // Tapping the space beside the panel dismisses it, on desktop and on the
@@ -380,5 +400,6 @@
     close: closeGallery,
     list: function () { return items.slice(); },
     refreshBadge: refreshBadge,
+    reload: reload,
   };
 })();
