@@ -44,11 +44,31 @@
     refreshBadge();
   }
 
+  function migrateLegacyStore() {
+    try {
+      var legacy = localStorage.getItem(STORE_KEY_BASE);
+      if (!legacy) return;
+      var parsed = JSON.parse(legacy);
+      if (!Array.isArray(parsed) || !parsed.length) return;
+      // Only migrate into a scoped key that is currently empty, so we never
+      // overwrite a user's own images with someone else's legacy data.
+      var current = localStorage.getItem(storeKey());
+      if (current) return;
+      items = parsed;
+      save();
+      // Clear the legacy key so it isn't re-read on every load.
+      localStorage.removeItem(STORE_KEY_BASE);
+    } catch (error) { /* ignore */ }
+  }
+
   function load() {
     try {
       var raw = localStorage.getItem(storeKey());
       var parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
+      if (!parsed.length) migrateLegacyStore();
+      var re = localStorage.getItem(storeKey());
+      var reparsed = re ? JSON.parse(re) : [];
+      return Array.isArray(reparsed) ? reparsed : [];
     } catch (error) {
       return [];
     }
