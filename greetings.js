@@ -51,10 +51,8 @@
     "Somebody call {name}",
     "Attention, {name}",
     "Curious how this works? Ask {name}",
-    "Half the fun is watching {name} figure it out",
     "It's {name}, folks",
     "{name}, let's make something good",
-    "Welcome, {name}. Everything is fine now.",
   ];
 
   /* Grand, absurd, a bit theatrical. Mixed into the rotation on purpose. */
@@ -126,12 +124,11 @@
     "What should we focus on?",
     "What are we building?",
     "Where do you want to start?",
-    "Ask anything. Start anywhere.",
+    "Ask anything.",
     "What needs thinking through?",
     "Pick a thread and pull.",
     "What's on your mind today?",
     "Ready when you are.",
-    "A blank page and a whole afternoon.",
     "What would make today easier?",
   ];
 

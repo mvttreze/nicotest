@@ -2828,7 +2828,7 @@ async function loadMemoryList() {
     if (count) count.textContent = `${items.length}/50`;
     box.innerHTML = "";
     if (!items.length) {
-      box.innerHTML = `<p class="dropdown-hint">Nothing stored yet — say “remember that…”</p>`;
+      box.innerHTML = `<p class=”dropdown-hint”>No saved memories</p>`;
       return;
     }
     items.forEach((m) => {
