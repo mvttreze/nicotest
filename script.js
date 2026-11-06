@@ -4309,15 +4309,17 @@ function hideGuestSignInPrompt() {
   guestPromptDismissed = true;
 }
 
-function signInAsGuest() {
+async function signInAsGuest() {
   // Clear any existing session so apiFetch sends no Authorization header -
   // the backend then treats the request as a guest (is_guest = true).
   localStorage.removeItem("nico_demo_auth_token");
   localStorage.removeItem("nico_demo_user");
   // Also sign out of Supabase so a refresh doesn't restore an admin
-  // session and re-populate the gallery with that user's images.
+  // session and re-populate the gallery with that user's images. Await it
+  // so the auth-state-change listener doesn't flip us back to the login
+  // screen after we set the guest session below.
   if (typeof authClient !== "undefined" && authClient) {
-    try { authClient.auth.signOut(); } catch {}
+    try { await authClient.auth.signOut(); } catch {}
   }
 
   const deviceId = getDeviceId();
