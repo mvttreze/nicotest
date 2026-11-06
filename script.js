@@ -557,6 +557,28 @@ function persistCurrentConversationId() {
   }
 }
 
+// Remove every locally cached conversation trace so the next account on
+// this device cannot see (or restore) the previous account's chats.
+function wipeLocalChatData() {
+  const doomed = [];
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (
+      key &&
+      (key.startsWith("nico_local_conversations:") ||
+        key.startsWith("nico_local_messages:") ||
+        key.startsWith("conversation_attachments:") ||
+        key.startsWith("active_chat_id") ||
+        key === "pinned_conversations")
+    ) {
+      doomed.push(key);
+    }
+  }
+  doomed.forEach((key) => localStorage.removeItem(key));
+  currentConversationId = createConversationId();
+  clearChatBox();
+}
+
 function attachmentStorageKey(conversationId = currentConversationId) {
   return `conversation_attachments:${conversationId}`;
 }
@@ -4455,12 +4477,9 @@ function updateAuthUi(user) {
     if (ownerBadge) ownerBadge.hidden = true;
     loadMyBadges();
     currentUser = null;
-    const restored = localStorage.getItem("active_chat_id");
-    if (isValidConversationId(restored)) {
-      currentConversationId = restored;
-    } else {
-      currentConversationId = createConversationId();
-    }
+    // Never restore a stored conversation id here: the signed-out screen
+    // must not resurrect another account's chat after the local data wipe.
+    currentConversationId = createConversationId();
     persistCurrentConversationId();
     if (document.getElementById("typingIndicator")) {
       document.getElementById("typingIndicator").innerText =
@@ -4505,14 +4524,13 @@ function updateAuthUi(user) {
   loadMyBadges();
 
   if (!authUiInitialized) {
-    const savedUserConversationId = localStorage.getItem(
-      `active_chat_id:${user.id}`,
-    );
-    currentConversationId = isValidConversationId(savedUserConversationId)
-      ? savedUserConversationId
-      : createConversationId();
     authUiInitialized = true;
-    clearChatBox();
+    // Fresh empty conversation on every sign-in (Google, Apple, or login):
+    // startNewChat() clears the box, rerolls the greeting, persists the new
+    // id under active_chat_id:<user.id> and refreshes recents. Old chats
+    // stay reachable from the sidebar recents list.
+    startNewChat();
+    return;
   }
   persistCurrentConversationId();
   loadRecentConversations();
@@ -5302,6 +5320,9 @@ document.getElementById("sign-out-btn")?.addEventListener("click", async () => {
   }
   localStorage.removeItem("nico_demo_auth_token");
   localStorage.removeItem("nico_demo_user");
+  // Wipe every locally cached conversation of the account that just signed
+  // out, so nothing carries over to the next sign-in on this device.
+  wipeLocalChatData();
   updateAuthUi(null);
 });
 document

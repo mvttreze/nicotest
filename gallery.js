@@ -15,6 +15,7 @@
   "use strict";
 
   var STORE_KEY_BASE = "nico_gallery_v1";
+  var LEGACY_MIGRATED_FLAG = "nico_gallery_v1_legacy_migrated";
   var MAX_ITEMS = 120;
   var THUMB_MAX = 512;
 
@@ -46,18 +47,19 @@
 
   function migrateLegacyStore() {
     try {
+      // One-shot per device: only the first account to open the gallery with
+      // an empty scoped store inherits the pre-scoping images. The flag then
+      // freezes the legacy blob so no later account can inherit it too.
+      if (localStorage.getItem(LEGACY_MIGRATED_FLAG)) return;
       var legacy = localStorage.getItem(STORE_KEY_BASE);
       if (!legacy) return;
       var parsed = JSON.parse(legacy);
-      if (!Array.isArray(parsed) || !parsed.length) return;
-      // Only migrate into a scoped key that is currently empty, so we never
-      // overwrite a user's own images with someone else's legacy data.
       var current = localStorage.getItem(storeKey());
-      if (current) return;
-      items = parsed;
-      save();
-      // Clear the legacy key so it isn't re-read on every load.
-      localStorage.removeItem(STORE_KEY_BASE);
+      if (Array.isArray(parsed) && parsed.length && !current) {
+        items = parsed;
+        save();
+      }
+      localStorage.setItem(LEGACY_MIGRATED_FLAG, "1");
     } catch (error) { /* ignore */ }
   }
 
