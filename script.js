@@ -4126,12 +4126,20 @@ function initializeSettingsPanel() {
     if (!control) return;
     control.value = settings[key] ?? control.value;
     if (control.type === "checkbox") control.checked = settings[key];
+    if (key === "personality" && settings.personality === "mica" && !canUseMica()) {
+      settings.personality = "professional";
+      control.value = "professional";
+    }
     control.addEventListener("input", () => {
       settings[key] =
         control.type === "checkbox" ? control.checked : control.value;
       if (key === "fontScale") settings.fontScale = Number(control.value);
       if (key === "personality") {
         syncDeveloperModePreference();
+        if (settings.personality === "mica" && !canUseMica()) {
+          settings.personality = "professional";
+          control.value = "professional";
+        }
       }
       saveSettings();
       applySettings();
@@ -4306,6 +4314,11 @@ function signInAsGuest() {
   // the backend then treats the request as a guest (is_guest = true).
   localStorage.removeItem("nico_demo_auth_token");
   localStorage.removeItem("nico_demo_user");
+  // Also sign out of Supabase so a refresh doesn't restore an admin
+  // session and re-populate the gallery with that user's images.
+  if (typeof authClient !== "undefined" && authClient) {
+    try { authClient.auth.signOut(); } catch {}
+  }
 
   const deviceId = getDeviceId();
   const guestUser = {
@@ -4329,6 +4342,22 @@ function signInAsGuest() {
 
 function isGuestUser() {
   return currentUser && currentUser.is_guest === true;
+}
+
+function canUseMica() {
+  // Mica / Nurturing is exclusive to badged users (tester, supporter, admin).
+  return myBadges.length > 0;
+}
+
+function enforceMicaBadge() {
+  const personalityControl = document.getElementById("personalitySetting");
+  if (!personalityControl) return;
+  if (settings.personality === "mica" && !canUseMica()) {
+    settings.personality = "professional";
+    personalityControl.value = "professional";
+    saveSettings();
+    applySettings();
+  }
 }
 
 function isDeveloperAccountUser(user) {
@@ -4360,6 +4389,7 @@ async function loadMyBadges() {
     } catch {}
   }
   myBadges = badges || [];
+  enforceMicaBadge();
   // A newer load started while we awaited: drop this stale result instead
   // of painting a duplicate set of chips.
   if (token !== myBadgeLoadToken) return;
