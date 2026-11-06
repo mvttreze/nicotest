@@ -62,8 +62,9 @@
                     aria-label="Show password"
                     aria-pressed="false"
                     title="Show password"
+                    data-icon="eye"
                 >
-                    <span aria-hidden="true">👁</span>
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z"/><circle cx="8" cy="8" r="1.8"/></svg>
                 </button>
             </div>
 
@@ -72,13 +73,11 @@
 
         <div class="auth-divider"><span>or</span></div>
 
-        <button class="auth-provider-btn" id="authGoogleBtn" type="button">
-            <span class="provider-mark google">G</span>
+        <button class="auth-provider-btn" id="authGoogleBtn" type="button" data-icon="google">
             Continue with Google
         </button>
 
-        <button class="auth-provider-btn" id="authAppleBtn" type="button">
-            <span class="provider-mark apple"></span>
+        <button class="auth-provider-btn" id="authAppleBtn" type="button" data-icon="apple">
             Continue with Apple
         </button>
 

@@ -4333,6 +4333,10 @@ async function signInAsGuest() {
   currentUser = guestUser;
   updateAuthUi(guestUser);
 
+  // Clear any prior (admin / signed-in) chat history so the guest starts
+  // fresh instead of seeing another user's messages on a shared device.
+  startNewChat();
+
   // Track this conversation against the per-device quota.
   const used = incrementGuestQuota();
   if (used >= GUEST_DAILY_LIMIT) {
@@ -4575,9 +4579,11 @@ function initializeAuthScreen() {
       willShow ? "Hide password" : "Show password",
     );
     passwordToggle.title = willShow ? "Hide password" : "Show password";
-    const icon = passwordToggle.querySelector("span");
+    const icon = passwordToggle.querySelector("svg");
     if (icon) {
-      icon.textContent = willShow ? "🙈" : "👁";
+      icon.innerHTML = willShow
+        ? '<path d="M1.5 6c0-1.103 1.397-2 3-2s3 .897 3 2-1.397 2-3 2-3-.897-3-2z"/><path d="M1 12a6 6 0 1 1 12 0A6 6 0 0 1 1 12z"/><circle cx="8" cy="6" r="1"/> '
+        : '<path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z"/><circle cx="8" cy="8" r="1.8"/>';
     }
     passwordInput.focus();
   });
