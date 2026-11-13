@@ -3986,7 +3986,9 @@ function setMobileSidebar(open, e) {
       open ? "Close sidebar" : "Open sidebar",
     );
     menuToggle.setAttribute("title", open ? "Close sidebar" : "Open sidebar");
-    menuToggle.textContent = open ? "×" : "☰";
+    menuToggle.innerHTML = open
+      ? '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg>'
+      : '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg>';
   }
 }
 
@@ -4224,10 +4226,44 @@ function initializeSettingsPanel() {
   });
 
   const setOpen = (open) => {
-    panel.classList.toggle("open", open);
+    if (window.NicoPanelDismiss && !panel.dataset.dismissRegistered) {
+      panel.dataset.dismissRegistered = "1";
+      window.NicoPanelDismiss.register({
+        panel,
+        scrimZ: 58,
+        isOpen: () => panel.classList.contains("open"),
+        close: () => closeButton.click(),
+        triggers: [button],
+      });
+    }
+    window.clearTimeout(panel._nicoCloseTimer);
+    if (open) {
+      if (!panel.classList.contains("open")) {
+        window.NicoPanelDismiss?.closeOthers();
+      }
+      panel.classList.remove("is-closing");
+      panel.classList.add("open");
+    } else if (panel.classList.contains("open")) {
+      panel.classList.add("is-closing");
+      panel._nicoCloseTimer = window.setTimeout(() => {
+        panel.classList.remove("open", "is-closing");
+        window.NicoPanelDismiss?.sync();
+      }, 320);
+    }
     panel.setAttribute("aria-hidden", String(!open));
     button.setAttribute("aria-expanded", String(open));
+    window.NicoPanelDismiss?.sync();
   };
+  if (window.NicoPanelDismiss && !panel.dataset.dismissRegistered) {
+    panel.dataset.dismissRegistered = "1";
+    window.NicoPanelDismiss.register({
+      panel,
+      scrimZ: 58,
+      isOpen: () => panel.classList.contains("open"),
+      close: () => setOpen(false),
+      triggers: [button],
+    });
+  }
   button.addEventListener("click", () => {
     const willOpen = !panel.classList.contains("open");
     setOpen(willOpen);
@@ -4422,6 +4458,17 @@ function refreshPersonalityOptions() {
     personalityControl.value = "professional";
     saveSettings();
     applySettings();
+  }
+  const quickTone = document.querySelector('#modeChips select[aria-label="Tone"]');
+  if (quickTone) {
+    const selected = settings.personality;
+    quickTone.replaceChildren();
+    Array.from(personalityControl.options)
+      .filter((option) => !option.hidden)
+      .forEach((option) => quickTone.add(new Option(option.text, option.value)));
+    quickTone.value = Array.from(quickTone.options).some((option) => option.value === selected)
+      ? selected
+      : "professional";
   }
 }
 

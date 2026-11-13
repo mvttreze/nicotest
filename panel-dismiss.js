@@ -130,4 +130,21 @@
   });
 
   window.NicoPanelDismiss = { register: register, sync: sync, closeOthers: closeOthers };
+
+  // script.js loads before this module and wires Settings immediately, so
+  // register its backdrop here once the shared dismiss API exists.
+  var settingsPanel = document.getElementById("settingsPanel");
+  if (settingsPanel && !settingsPanel.dataset.dismissRegistered) {
+    settingsPanel.dataset.dismissRegistered = "1";
+    register({
+      panel: settingsPanel,
+      scrimZ: 58,
+      isOpen: function () { return settingsPanel.classList.contains("open"); },
+      close: function () {
+        var closeButton = document.getElementById("closeSettingsBtn");
+        if (closeButton) closeButton.click();
+      },
+      triggers: [document.getElementById("settingsBtn")],
+    });
+  }
 })();

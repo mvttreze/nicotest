@@ -24,7 +24,17 @@
     const sel = document.createElement("select");
     sel.setAttribute("aria-label", label);
     wrap.append(label, sel);
-    [...src.options].forEach((o) => sel.add(new Option(o.text, o.value)));
+    const syncOptions = () => {
+      const value = src.value;
+      sel.replaceChildren();
+      [...src.options].filter((option) => !option.hidden).forEach((option) => {
+        sel.add(new Option(option.text, option.value));
+      });
+      sel.value = [...sel.options].some((option) => option.value === value)
+        ? value
+        : src.options[0]?.value || "";
+    };
+    syncOptions();
     sel.addEventListener("change", () => {
       src.value = sel.value;
       // script.js saves settings on "input", so fire that (plus "change" for anything else listening)
@@ -32,6 +42,12 @@
       src.dispatchEvent(new Event("change", { bubbles: true }));
     });
     src.addEventListener("change", () => (sel.value = src.value));
+    new MutationObserver(syncOptions).observe(src, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["hidden"],
+    });
     chips.append(wrap);
     pairs.push([src, sel]);
   });
@@ -162,7 +178,7 @@
     ].forEach(([id, g]) => {
       const s = document.getElementById(id);
       if (s)
-        [...s.options].forEach((o) =>
+        [...s.options].filter((option) => !option.hidden).forEach((o) =>
           add(g, g + ": " + o.text, () => setSelect(id, o.value)),
         );
     });

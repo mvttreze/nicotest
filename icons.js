@@ -49,6 +49,18 @@
     palette:
       '<path d="M8 14A6 6 0 1 1 14 8c0 1.8-1.4 2.4-2.6 2.4h-1.2c-.9 0-1.6.7-1.6 1.6 0 .4.2.8.4 1.1.3.4.5.7.5 1.1 0 .5-.5.8-1.5.8z"/><circle cx="5.4" cy="7.2" r=".8" fill="currentColor" stroke="none"/><circle cx="7.8" cy="4.9" r=".8" fill="currentColor" stroke="none"/><circle cx="10.6" cy="6" r=".8" fill="currentColor" stroke="none"/>',
     bookmark: '<path d="M4.5 2.5h7v11L8 10.8l-3.5 2.7z"/>',
+    minus: '<path d="M3.5 8h9"/>',
+    search: '<circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/>',
+    link: '<path d="M6.2 9.8 9.8 6.2"/><path d="M5.2 11.8H4a2.5 2.5 0 0 1 0-5h2M10 4h2a2.5 2.5 0 0 1 0 5h-1.2"/>',
+    lock: '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>',
+    unlock: '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.7-1.2"/>',
+    'cloud-upload': '<path d="M4 11.5a3 3 0 0 1 .2-6A4.5 4.5 0 0 1 12.8 7 2.5 2.5 0 0 1 12 12h-1"/><path d="M8 14V8m-2.5 2.5L8 8l2.5 2.5"/>',
+    star: '<path d="m8 1.8 1.8 4.4 4.7.3-3.6 3 1.2 4.6L8 11.6l-4.1 2.5 1.2-4.6-3.6-3 4.7-.3z"/>',
+    heart: '<path d="M8 13.7 2.5 8.4C-.5 5.1 4.4 1.4 8 5 11.6 1.4 16.5 5.1 13.5 8.4z"/>',
+    zap: '<path d="M9 1.8 3.5 8.5h4l-.5 5.7 5.5-7h-4z"/>',
+    shield: '<path d="M8 1.8 13 4v3.5c0 3-1.8 5.2-5 6.7-3.2-1.5-5-3.7-5-6.7V4z"/><path d="m5.8 7.8 1.5 1.5 3-3"/>',
+    cloud: '<path d="M4 12.5a3 3 0 0 1 .2-6A4.5 4.5 0 0 1 12.8 8 2.3 2.3 0 0 1 12 12.5z"/>',
+    'download-cloud': '<path d="M4 11.5a3 3 0 0 1 .2-6A4.5 4.5 0 0 1 12.8 7 2.5 2.5 0 0 1 12 12h-1"/><path d="M8 8v5m-2-2 2 2 2-2"/>',
   };
 
   /**
@@ -106,7 +118,6 @@
       "\uD83D\uDCCB": "document", // clipboard
       "\u2726": "sparkle", // black four-pointed star
       "\u2727": "sparkle", // white four-pointed star
-      "\u270E": "download", // pencil
       "\u2731": "plus", // open centre star
       "\uD83D\uDD25": "sparkle", // fire
       "\uD83D\uDD14": "bell", // bell
@@ -116,6 +127,12 @@
       "\uD83D\uDCC1": "document", // page with curl
       "\u270F": "plus", // pencil
       "\u2712": "plus", // check
+      "\u00D7": "x", // multiplication sign used as a close affordance
+      "\u22EE": "document", // vertical menu
+      "\u2197": "link", // external link
+      "\u2691": "bookmark", // flag pin
+      "\u270E": "type", // edit pencil
+      "\u2193": "download", // down arrow
     };
     // A run may carry a variation selector (U+FE0F) or zero-width joiner, and
     // the console/markup may show a glyph as either surrogate half. Normalise
@@ -128,6 +145,58 @@
     return map[normalised] || map[t] || null;
   }
 
+  function buttonIconName(button) {
+    var label = [button.getAttribute("aria-label"), button.title, button.textContent]
+      .filter(Boolean).join(" ").toLowerCase();
+    if (/close|dismiss|remove/.test(label)) return "x";
+    if (/delete|trash|forget|clear|revoke/.test(label)) return "trash";
+    if (/copy|clipboard/.test(label)) return "copy";
+    if (/download|export|save file/.test(label)) return "download";
+    if (/upload|attach|add file|add photo/.test(label)) return "cloud-upload";
+    if (/search|find/.test(label)) return "search";
+    if (/settings|preferences/.test(label)) return "settings";
+    if (/reminder|notification|bell/.test(label)) return "bell";
+    if (/gallery|image|photo|picture/.test(label)) return "image";
+    if (/link|share|open in new tab/.test(label)) return "link";
+    if (/lock|privacy/.test(label)) return "lock";
+    if (/unlock/.test(label)) return "unlock";
+    if (/stop|cancel generation/.test(label)) return "square";
+    if (/send|sign in|sign-in/.test(label)) return "arrow-up";
+    if (/new chat|add|create|grant|publish/.test(label)) return "plus";
+    if (/pin|bookmark/.test(label)) return "bookmark";
+    if (/favorite|favourite|like/.test(label)) return "heart";
+    if (/star/.test(label)) return "star";
+    if (/theme|appearance|color/.test(label)) return "palette";
+    if (/font|text|rename|edit/.test(label)) return "type";
+    if (/vision|screen|capture/.test(label)) return "eye";
+    if (/project|artifact|document|module/.test(label)) return "document";
+    if (/refresh|retry|reload/.test(label)) return "download";
+    return "sparkle";
+  }
+
+  function ensureButtonIcon(button) {
+    if (!button || button.tagName !== "BUTTON" || button.querySelector("svg")) return;
+    var name = buttonIconName(button);
+    if (!PATHS[name]) return;
+    var span = document.createElement("span");
+    span.className = "nico-inline-icon";
+    span.setAttribute("aria-hidden", "true");
+    span.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' + PATHS[name] + "</svg>";
+    button.insertBefore(span, button.firstChild);
+  }
+
+  function enhanceButtons(root) {
+    if (root.nodeType === 1 && root.matches("button")) {
+      iconify(root);
+      ensureButtonIcon(root);
+    }
+    if (!root.querySelectorAll) return;
+    root.querySelectorAll("button").forEach(function (button) {
+      iconify(button);
+      ensureButtonIcon(button);
+    });
+  }
+
   function boot() {
     // Only chrome we own: buttons, links, menu icons. Never chat content.
     var chrome = document.querySelectorAll(
@@ -137,17 +206,20 @@
       if (el.dataset.icoDone === "1") return;
       el.dataset.icoDone = "1";
       iconify(el);
+      ensureButtonIcon(el);
     });
 
-    // data-icon slots declared in markup (quick-access rail, sidebar).
-    Array.prototype.forEach.call(document.querySelectorAll("[data-icon]"), function (el) {
-      var name = el.getAttribute("data-icon");
-      if (!PATHS[name] || el.querySelector("svg")) return;
-      el.innerHTML =
-        '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        PATHS[name] + "</svg>";
-    });
+    // Static controls already carry inline SVG in index.html. This observer
+    // covers buttons created later for chat actions, rows, and panel content.
+    if (document.body && typeof MutationObserver !== "undefined") {
+      new MutationObserver(function (records) {
+        records.forEach(function (record) {
+          record.addedNodes.forEach(function (node) {
+            if (node.nodeType === 1) enhanceButtons(node);
+          });
+        });
+      }).observe(document.body, { childList: true, subtree: true });
+    }
 
     wireQuickAccess();
     // The other two panels own their own badges; refresh whichever loaded.
