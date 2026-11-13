@@ -4721,6 +4721,10 @@ function initializeAuthScreen() {
   });
 
   appleButton?.addEventListener("click", () => {
+    if (authClient) {
+      signInWithApple();
+      return;
+    }
     alert("Apple sign-in is not configured yet.");
   });
 }
@@ -4732,6 +4736,18 @@ async function signInWithGoogle() {
   }
   const { error } = await authClient.auth.signInWithOAuth({
     provider: "google",
+    options: { redirectTo: window.location.href.split("#")[0] },
+  });
+  if (error) alert(`Sign-in failed: ${error.message}`);
+}
+
+async function signInWithApple() {
+  if (!authClient) {
+    alert("Supabase authentication is not configured yet.");
+    return;
+  }
+  const { error } = await authClient.auth.signInWithOAuth({
+    provider: "apple",
     options: { redirectTo: window.location.href.split("#")[0] },
   });
   if (error) alert(`Sign-in failed: ${error.message}`);
