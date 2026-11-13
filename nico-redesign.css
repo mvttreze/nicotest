@@ -2955,3 +2955,146 @@ body .composer-toast.show { animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Keep the app header visually open instead of rendering a gray toolbar. */
+body .top-header {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  justify-content: flex-start;
+}
+body .top-header-actions {
+  margin-left: auto !important;
+  margin-right: 0;
+}
+
+/* Center icon artwork consistently inside its button hit area. */
+body button > svg,
+body button > span:has(> svg) {
+  align-self: center;
+  flex: 0 0 auto;
+}
+body button > svg { display: block; }
+body button > span:has(> svg) {
+  display: inline-grid;
+  place-items: center;
+  line-height: 0;
+}
+body .settings-btn,
+body .icon-btn,
+body .mobile-menu-btn,
+body .settings-close,
+body .vision-close,
+body .guest-prompt-dismiss {
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+body .quick-link,
+body .new-chat-btn,
+body .send-btn,
+body .settings-tab,
+body .seg-btn,
+body .welcome-suggestions button,
+body .guest-prompt-signin {
+  align-items: center;
+}
+
+/* A compact, aligned guest notice sits at the top of the main column. */
+body .guest-prompt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  position: absolute;
+  z-index: 12;
+  top: 10px;
+  right: auto;
+  left: 50%;
+  translate: -50% 0;
+  width: min(440px, calc(100% - 36px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: 400 0.88rem/1.35 var(--ui);
+  text-align: left;
+}
+body .guest-prompt.hidden { display: none; }
+body .guest-prompt-icon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--accent-2);
+}
+body .guest-prompt-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+body .guest-prompt-copy strong {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+body .guest-prompt-copy span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+body .guest-prompt-signin {
+  display: inline-flex;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-2);
+  font: 600 0.8rem/1 var(--ui);
+  white-space: nowrap;
+}
+body .guest-prompt-signin svg { width: 16px; height: 16px; }
+body .guest-prompt-dismiss {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 9px;
+}
+
+@media (max-width: 600px) {
+  body .guest-prompt {
+    gap: 9px;
+    position: relative;
+    top: auto;
+    right: auto;
+    left: 50%;
+    translate: -50% 0;
+    width: calc(100% - 24px);
+    margin: 0;
+    padding: 8px 9px;
+  }
+  body .guest-prompt-copy span { font-size: 0.73rem; }
+  body .guest-prompt-signin { min-height: 36px; padding: 0 9px; }
+}
+
+/* On compact desktops, keep the toolbar at the top edge and center the notice beneath it. */
+@media (min-width: 601px) and (max-width: 1368px) {
+  body .guest-prompt { top: 70px; }
+  body .main-content:has(.guest-prompt:not(.hidden)) .top-header {
+    margin-top: 0;
+  }
+}
