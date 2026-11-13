@@ -4504,6 +4504,7 @@ function updateAuthUi(user) {
   const accountChanged = previousUserId !== nextUserId;
   if (accountChanged) {
     myBadges = [];
+    document.getElementById("recent-chats")?.replaceChildren();
     if (user) {
       // Clear the previous account's transcript before rendering the new
       // identity or loading account-specific content.
