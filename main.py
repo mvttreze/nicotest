@@ -1519,7 +1519,7 @@ def build_docx(title, markdown_text):
         )
         _add_docx_runs(paragraph, item)
     elif kind == "hr":
-      doc.add_paragraph("—" * 12)
+      doc.add_paragraph("-" * 12)
   buf = io.BytesIO()
   doc.save(buf)
   buf.seek(0)

@@ -1,7 +1,7 @@
 {
   "name": "Nico OS",
   "short_name": "Nico",
-  "description": "Nico — personal AI assistant",
+  "description": "Nico - personal AI assistant",
   "id": "./",
   "start_url": "./",
   "scope": "./",

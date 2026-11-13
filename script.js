@@ -737,13 +737,13 @@ function setupVoiceRecognition() {
     }
     const kind = event?.error || "unknown";
     if (kind === "not-allowed" || kind === "service-not-allowed") {
-      showComposerToast("Mic blocked — allow microphone access");
+      showComposerToast("Mic blocked - allow microphone access");
     } else if (kind === "no-speech") {
-      showComposerToast("Didn't catch that — try again");
+      showComposerToast("Didn't catch that - try again");
     } else if (kind === "audio-capture") {
       showComposerToast("No microphone found");
     } else if (kind !== "aborted") {
-      showComposerToast("Voice input failed — try again");
+      showComposerToast("Voice input failed - try again");
     }
   };
 
@@ -798,7 +798,7 @@ function toggleSpeech() {
   } catch (error) {
     isListening = false;
     if (micBtn) micBtn.classList.remove("recording");
-    showComposerToast("Voice input failed — try again");
+    showComposerToast("Voice input failed - try again");
   }
 }
 
@@ -822,7 +822,7 @@ function setAttachMenu(open) {
   const menu = getAttachMenu();
   const btn = getAddBtn();
   if (!menu || !btn) {
-    showComposerToast("Attach menu unavailable — hard-refresh the page");
+    showComposerToast("Attach menu unavailable - hard-refresh the page");
     return false;
   }
   menu.classList.toggle("open", open);
@@ -1028,14 +1028,14 @@ async function addImageAttachments(imageFiles) {
       continue;
     }
     // iPhone photos arrive as HEIC, which browsers can't preview and vision
-    // APIs often reject — convert to JPEG so preview and analysis both work.
+    // APIs often reject - convert to JPEG so preview and analysis both work.
     if (isHeicFile(file)) {
       showComposerToast("Converting iPhone photo…");
       const converted = await convertHeicToJpeg(file);
       if (converted) {
         file = converted;
       } else {
-        showComposerToast("Couldn't convert — sending original");
+        showComposerToast("Couldn't convert - sending original");
       }
     }
     const extension = getPastedImageExtension(file.type);
@@ -1061,7 +1061,7 @@ async function addImageAttachments(imageFiles) {
   renderAttachments();
   autoGrowComposer();
   if (added > 0) {
-    showComposerToast(added === 1 ? "Image attached — press Send" : `${added} images attached`);
+    showComposerToast(added === 1 ? "Image attached - press Send" : `${added} images attached`);
     userInput?.focus();
   }
 }
@@ -1588,7 +1588,7 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
   }
   chatBox.scrollTop = chatBox.scrollHeight;
   if (sendBtn) {
-    sendBtn.innerText = "Stop";
+    setSendButtonState("stop");
     sendBtn.onclick = stopGeneration;
   }
   currentAbortController = new AbortController();
@@ -1774,7 +1774,7 @@ async function persistEdit(msgDiv, oldText, newText) {
         body: JSON.stringify({ content: newText }),
       });
     } catch {
-      showComposerToast("Edit applied here — history sync failed");
+      showComposerToast("Edit applied here - history sync failed");
     }
   }
 }
@@ -1934,7 +1934,7 @@ function appendAttachmentImages(content, attachments = []) {
     image.onerror = () => {
       const note = document.createElement("div");
       note.className = "message-image-unavailable";
-      note.textContent = `🖼 ${attachment.name || "Attached image"} (preview unavailable — Nico still received the file)`;
+      note.textContent = `🖼 ${attachment.name || "Attached image"} (preview unavailable - Nico still received the file)`;
       image.replaceWith(note);
     };
     content.appendChild(image);
@@ -2481,9 +2481,29 @@ function stopGeneration() {
   resetSendButton();
 }
 
+// Swap the composer button between Send (arrow up) and Stop (square) without
+// wiping its inline icon markup. Same path strings as the index.html markup.
+function setSendButtonState(mode) {
+  if (!sendBtn) return;
+  const isStop = mode === "stop";
+  const iconWrap = document.getElementById("sendBtnIcon");
+  const label = document.getElementById("sendBtnLabel");
+  if (iconWrap) {
+    const svg = iconWrap.querySelector("svg");
+    if (svg) {
+      svg.innerHTML = isStop
+        ? '<rect x="4" y="4" width="8" height="8" rx="1.2"/>'
+        : '<path d="M8 13V3"/><path d="M3.5 7.5L8 3l4.5 4.5"/>';
+    }
+  }
+  if (label) label.textContent = isStop ? "Stop" : "Send";
+  sendBtn.classList.toggle("is-stopping", isStop);
+  sendBtn.setAttribute("aria-label", isStop ? "Stop generating" : "Send message");
+}
+
 function resetSendButton() {
   if (sendBtn) {
-    sendBtn.innerText = "Send";
+    setSendButtonState("send");
     sendBtn.onclick = sendMessage;
   }
 }
@@ -2723,13 +2743,13 @@ async function handleReminderSend(raw) {
   if (!parsed) return false;
   appendMessage("user", raw, []);
   if (parsed.error) {
-    appendMessage("assistant", "Got it — what time? Try `in 20 minutes` or `at 7pm`.", []);
+    appendMessage("assistant", "Got it - what time? Try `in 20 minutes` or `at 7pm`.", []);
     return true;
   }
   if (parsed.needTime) {
     appendMessage(
       "assistant",
-      "Sure — when should I remind you? (e.g. `in 20 minutes` or `tomorrow at 8am`)",
+      "Sure - when should I remind you? (e.g. `in 20 minutes` or `tomorrow at 8am`)",
       [],
     );
     return true;
@@ -2740,7 +2760,7 @@ async function handleReminderSend(raw) {
     } catch {}
   }
   const r = addReminder(parsed.label, parsed.dueAt);
-  appendMessage("assistant", `Done — I'll remind you ${fmtWhen(r.dueAt)}: **${r.label}**`, []);
+  appendMessage("assistant", `Done - I'll remind you ${fmtWhen(r.dueAt)}: **${r.label}**`, []);
   return true;
 }
 
@@ -2767,7 +2787,7 @@ function renderReminderPanel() {
   if (!pending.length) {
     const empty = document.createElement("p");
     empty.className = "dropdown-hint";
-    empty.textContent = "No reminders — try “remind me in 20 minutes”";
+    empty.textContent = "No reminders - try “remind me in 20 minutes”";
     panel.appendChild(empty);
     return;
   }
@@ -2902,14 +2922,14 @@ async function handleRememberCommand(raw) {
         (await res.json().catch(() => ({}))).detail || "Couldn't save that",
       );
     }
-    appendMessage("assistant", "Got it — I'll remember that.", []);
+    appendMessage("assistant", "Got it - I'll remember that.", []);
     loadMemoryList();
   } catch (err) {
     appendMessage(
       "assistant",
       err?.message === "Sign-in required"
         ? "I can only keep long-term memories once you're signed in."
-        : `I couldn't save that — ${err?.message || "try again"}.`,
+        : `I couldn't save that - ${err?.message || "try again"}.`,
       [],
     );
   }
@@ -2933,7 +2953,7 @@ async function handleRecallCommand(raw) {
       "assistant",
       items.length
         ? `Here's what I remember:\n${items.map((i) => `- ${i.content}`).join("\n")}`
-        : "Nothing stored yet — tell me something with “remember that…”.",
+        : "Nothing stored yet - tell me something with “remember that…”.",
       [],
     );
   } catch {
@@ -2962,7 +2982,7 @@ async function runBriefing() {
   const lines = [];
   const now = new Date();
   lines.push(
-    `**${now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} — ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}**`,
+    `**${now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} - ${now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}**`,
   );
   const city = (settings.briefCity || "").trim();
   if (city) {
@@ -2981,15 +3001,15 @@ async function runBriefing() {
       ).json();
       const w = wmoText(wx.current.weather_code);
       lines.push(
-        `\n**Weather in ${place.name}** — ${w.icon} ${Math.round(wx.current.temperature_2m)}°C, ${w.label}. High ${Math.round(wx.daily.temperature_2m_max[0])}° / low ${Math.round(wx.daily.temperature_2m_min[0])}°.`,
+        `\n**Weather in ${place.name}** - ${w.icon} ${Math.round(wx.current.temperature_2m)}°C, ${w.label}. High ${Math.round(wx.daily.temperature_2m_max[0])}° / low ${Math.round(wx.daily.temperature_2m_min[0])}°.`,
       );
     } catch {
       lines.push(
-        `\n**Weather** — couldn't load “${city}”. Check the city name in Settings → Behavior.`,
+        `\n**Weather** - couldn't load “${city}”. Check the city name in Settings → Behavior.`,
       );
     }
   } else {
-    lines.push(`\n**Weather** — set your city in Settings → Behavior to get forecasts.`);
+    lines.push(`\n**Weather** - set your city in Settings → Behavior to get forecasts.`);
   }
   const todays = readReminders()
     .filter((r) => !r.done && new Date(r.dueAt).toDateString() === now.toDateString())
@@ -2997,7 +3017,7 @@ async function runBriefing() {
   lines.push(
     todays.length
       ? `\n**Today's reminders**\n${todays.map((r) => `- ${r.label} (${fmtWhen(r.dueAt)})`).join("\n")}`
-      : `\n**Reminders** — nothing due today.`,
+      : `\n**Reminders** - nothing due today.`,
   );
   try {
     const ids = await (
@@ -3018,10 +3038,10 @@ async function runBriefing() {
     lines.push(
       titles.length
         ? `\n**Tech headlines**\n${titles.join("\n")}`
-        : `\n**Tech headlines** — unavailable right now.`,
+        : `\n**Tech headlines** - unavailable right now.`,
     );
   } catch {
-    lines.push(`\n**Tech headlines** — unavailable right now.`);
+    lines.push(`\n**Tech headlines** - unavailable right now.`);
   }
   appendMessage("assistant", lines.join("\n"), []);
 }
@@ -3078,7 +3098,7 @@ function startWakeLoop() {
       stopWakeLoop();
       const box = document.getElementById("wakeSetting");
       if (box) box.checked = false;
-      showComposerToast("Wake word needs mic permission — turned off");
+      showComposerToast("Wake word needs mic permission - turned off");
     }
   };
   try {
@@ -3216,7 +3236,7 @@ async function handleCliCommand(task, tool, raw) {
   if (!shell || typeof shell.runCli !== "function") {
     appendMessage(
       "assistant",
-      "CLI hands need the Nico desktop app — `/cli` doesn't run in the browser. Open Nico Desktop and try again.",
+      "CLI hands need the Nico desktop app - `/cli` doesn't run in the browser. Open Nico Desktop and try again.",
       [],
     );
     return true;
@@ -3225,14 +3245,14 @@ async function handleCliCommand(task, tool, raw) {
   if (!myBadges.length) {
     appendMessage(
       "assistant",
-      "CLI hands are tester-gated — sign in with a badged account (ask Matt for a tester badge) and try again.",
+      "CLI hands are tester-gated - sign in with a badged account (ask Matt for a tester badge) and try again.",
       [],
     );
     return true;
   }
   appendMessage(
     "assistant",
-    `_Running that with \`${tool}\` in \`nico-workspace\` — this can take a minute…_`,
+    `_Running that with \`${tool}\` in \`nico-workspace\` - this can take a minute…_`,
     [],
   );
   let result;
@@ -3246,7 +3266,7 @@ async function handleCliCommand(task, tool, raw) {
     const safe = String(result.output || "(no output)").replace(/```/g, "'''");
     appendMessage(
       "assistant",
-      `**${tool} finished** — files land in Documents/nico-workspace:\n\`\`\`\n${safe}\n\`\`\``,
+      `**${tool} finished** - files land in Documents/nico-workspace:\n\`\`\`\n${safe}\n\`\`\``,
       [],
     );
   } else {
@@ -3303,7 +3323,7 @@ async function maybeHandleLocalCommand(raw) {
     saveSettings();
     appendMessage(
       "assistant",
-      `City set to **${settings.briefCity}** — I'll use it for briefings.`,
+      `City set to **${settings.briefCity}** - I'll use it for briefings.`,
       [],
     );
     return true;
@@ -3391,7 +3411,7 @@ async function maybeHandleLocalCommand(raw) {
   if (imgIntent) {
     if (imgIntent.ask) {
       appendMessage("user", text, []);
-      appendMessage("assistant", "Describe the image first — e.g. `draw a robot at sunset`.", []);
+      appendMessage("assistant", "Describe the image first - e.g. `draw a robot at sunset`.", []);
       return true;
     }
     await handleImagine(imgIntent.prompt, text);
@@ -3419,7 +3439,7 @@ function chatToMarkdown() {
     const content = msg.querySelector(".content")?.innerText || "";
     return `**${role}:**\n${content}\n`;
   });
-  return `# Nico conversation — ${new Date().toLocaleString()}\n\n${lines.join("\n---\n\n")}`;
+  return `# Nico conversation - ${new Date().toLocaleString()}\n\n${lines.join("\n---\n\n")}`;
 }
 
 function downloadBlob(blob, filename) {
@@ -3447,7 +3467,7 @@ function toggleExportMenu(force) {
 function stampPrintHeader() {
   const head = document.getElementById("printHeader");
   if (head) {
-    head.textContent = `Nico conversation — ${new Date().toLocaleString()}`;
+    head.textContent = `Nico conversation - ${new Date().toLocaleString()}`;
   }
 }
 
@@ -3549,7 +3569,7 @@ async function handleGenerateDoc(kind, topic, display) {
   const shown = (display || `Make a ${kind} about ${topic}`).trim() || `Make a ${kind} file`;
   appendMessage("user", shown, []);
   if (!topic) {
-    appendMessage("assistant", "Give me a topic first — e.g. `make a pdf about sourdough`.", []);
+    appendMessage("assistant", "Give me a topic first - e.g. `make a pdf about sourdough`.", []);
     return;
   }
   const title = docTitleFromTopic(topic);
@@ -3599,7 +3619,7 @@ async function handleGenerateDoc(kind, topic, display) {
     // up in the sidebar immediately instead of only after a reload.
     loadRecentConversations();
   } catch {
-    appendMessage("assistant", "I couldn't build that file — try again.", []);
+    appendMessage("assistant", "I couldn't build that file - try again.", []);
   } finally {
     hideThinking();
   }
@@ -3653,7 +3673,7 @@ async function handleImagine(prompt, display) {
   const shown = (display || prompt || "").trim() || prompt;
   appendMessage("user", shown, []);
   if (!prompt) {
-    appendMessage("assistant", "Describe the image first — e.g. `draw a robot at sunset`.", []);
+    appendMessage("assistant", "Describe the image first - e.g. `draw a robot at sunset`.", []);
     return;
   }
   showThinking();
@@ -3698,7 +3718,7 @@ async function handleImagine(prompt, display) {
     const reason = error?.message && error.message !== "render failed"
       ? ` (${String(error.message).slice(0, 200)})`
       : "";
-    appendMessage("assistant", `I couldn't render that image${reason} — try again in a bit.`, []);
+    appendMessage("assistant", `I couldn't render that image${reason} - try again in a bit.`, []);
   } finally {
     hideThinking();
   }
@@ -3716,7 +3736,7 @@ async function sendMessage() {
   // Never silently drop the files: if nothing usable could be read, stop
   // here instead of sending a text-only message Nico will misread.
   if (attachmentRequest.failed) {
-    showComposerToast("Couldn't read the attached file — try JPG or PNG");
+    showComposerToast("Couldn't read the attached file - try JPG or PNG");
     return;
   }
   const message = attachmentRequest.message;
@@ -3774,7 +3794,7 @@ async function sendMessage() {
   chatBox.scrollTop = chatBox.scrollHeight;
 
   if (sendBtn) {
-    sendBtn.innerText = "Stop";
+    setSendButtonState("stop");
     sendBtn.onclick = stopGeneration;
   }
 
@@ -4148,17 +4168,15 @@ function initializeSettingsPanel() {
     if (!control) return;
     control.value = settings[key] ?? control.value;
     if (control.type === "checkbox") control.checked = settings[key];
-    if (key === "personality" && settings.personality === "mica" && !canUseMica()) {
-      settings.personality = "professional";
-      control.value = "professional";
-    }
+    if (key === "personality") refreshPersonalityOptions();
     control.addEventListener("input", () => {
       settings[key] =
         control.type === "checkbox" ? control.checked : control.value;
       if (key === "fontScale") settings.fontScale = Number(control.value);
       if (key === "personality") {
         syncDeveloperModePreference();
-        if (settings.personality === "mica" && !canUseMica()) {
+        if ((settings.personality === "mica" && !canUseMica()) ||
+            (settings.personality === "developer" && !isDeveloperAccountUser(currentUser))) {
           settings.personality = "professional";
           control.value = "professional";
         }
@@ -4227,7 +4245,7 @@ function initializeSettingsPanel() {
     .getElementById("exportMarkdownBtn")
     .addEventListener("click", exportChat);
   document
-    .getElementById("exportJsonBtn")
+    .getElementById("settingsExportJsonBtn")
     .addEventListener("click", exportChatJson);
   document.getElementById("clearContextBtn").addEventListener("click", () => {
     settings.context = false;
@@ -4380,7 +4398,26 @@ function canUseMica() {
 function enforceMicaBadge() {
   const personalityControl = document.getElementById("personalitySetting");
   if (!personalityControl) return;
-  if (settings.personality === "mica" && !canUseMica()) {
+  refreshPersonalityOptions();
+  if ((settings.personality === "mica" && !canUseMica()) ||
+      (settings.personality === "developer" && !isDeveloperAccountUser(currentUser))) {
+    settings.personality = "professional";
+    personalityControl.value = "professional";
+    saveSettings();
+    applySettings();
+  }
+}
+
+function refreshPersonalityOptions() {
+  const personalityControl = document.getElementById("personalitySetting");
+  if (!personalityControl) return;
+  const micaOption = personalityControl.querySelector('option[value="mica"]');
+  const developerOption = personalityControl.querySelector('option[value="developer"]');
+  if (micaOption) micaOption.hidden = !canUseMica();
+  if (developerOption) developerOption.hidden = !isDeveloperAccountUser(currentUser);
+  const micaBlocked = settings.personality === "mica" && !canUseMica();
+  const developerBlocked = settings.personality === "developer" && !isDeveloperAccountUser(currentUser);
+  if (micaBlocked || developerBlocked) {
     settings.personality = "professional";
     personalityControl.value = "professional";
     saveSettings();
@@ -4416,11 +4453,11 @@ async function loadMyBadges() {
       if (res.ok) badges = (await res.json()).badges || [];
     } catch {}
   }
-  myBadges = badges || [];
-  enforceMicaBadge();
   // A newer load started while we awaited: drop this stale result instead
   // of painting a duplicate set of chips.
   if (token !== myBadgeLoadToken) return;
+  myBadges = badges || [];
+  enforceMicaBadge();
   wrap.querySelectorAll(".earned-badge").forEach((el) => el.remove());
   const labels = {
     tester: "Tester",
@@ -4461,7 +4498,20 @@ function updateAuthUi(user) {
   appLayout?.classList.toggle("logged-in-mode", !!user);
   appLayout?.classList.toggle("is-guest", user?.is_guest);
 
+  const previousUserId = currentUser?.id || null;
+  const nextUserId = user?.id || null;
   currentUser = user;
+  const accountChanged = previousUserId !== nextUserId;
+  if (accountChanged) {
+    myBadges = [];
+    if (user) {
+      // Clear the previous account's transcript before rendering the new
+      // identity or loading account-specific content.
+      startNewChat();
+      authUiInitialized = true;
+    }
+  }
+  refreshPersonalityOptions();
   // Reload the gallery so it shows the correct user's images on a shared device.
   window.NicoGallery?.reload();
   if (!user) {
@@ -4480,7 +4530,6 @@ function updateAuthUi(user) {
     // Never restore a stored conversation id here: the signed-out screen
     // must not resurrect another account's chat after the local data wipe.
     currentConversationId = createConversationId();
-    persistCurrentConversationId();
     if (document.getElementById("typingIndicator")) {
       document.getElementById("typingIndicator").innerText =
         getAssistantThinkingLabel();
@@ -4598,11 +4647,16 @@ function initializeAuthScreen() {
     );
     passwordToggle.title = willShow ? "Hide password" : "Show password";
     const icon = passwordToggle.querySelector("svg");
-    if (icon) {
-      icon.innerHTML = willShow
-        ? '<path d="M1.5 6c0-1.103 1.397-2 3-2s3 .897 3 2-1.397 2-3 2-3-.897-3-2z"/><path d="M1 12a6 6 0 1 1 12 0A6 6 0 0 1 1 12z"/><circle cx="8" cy="6" r="1"/> '
-        : '<path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z"/><circle cx="8" cy="8" r="1.8"/>';
-    }
+    // Pull the paths from the shared icon set when it has booted, with the
+    // same strings inline as a fallback so the toggle works either way.
+    const paths = window.NicoIcons?.PATHS || {};
+    const closedEye =
+      paths["eye-closed"] ||
+      '<path d="M1.5 6c0-1.103 1.397-2 3-2s3 .897 3 2-1.397 2-3 2-3-.897-3-2z"/><path d="M1 12a6 6 0 1 1 12 0A6 6 0 0 1 1 12z"/><circle cx="8" cy="6" r="1"/>';
+    const openEye =
+      paths.eye ||
+      '<path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z"/><circle cx="8" cy="8" r="1.8"/>';
+    if (icon) icon.innerHTML = willShow ? closedEye : openEye;
     passwordInput.focus();
   });
 
@@ -4804,10 +4858,10 @@ function renderAdminOverview(body, stats, overview = {}) {
   const activity = stats.activity || [];
   const peak = Math.max(1, ...activity.map((a) => a.messages));
   const cards = [
-    ["Conversations", counts.conversations ?? "—"],
-    ["Messages", counts.messages ?? "—"],
-    ["Users", counts.auth_users ?? counts.demo_users ?? "—"],
-    ["Memories", counts.memories ?? "—"],
+    ["Conversations", counts.conversations ?? "-"],
+    ["Messages", counts.messages ?? "-"],
+    ["Users", counts.auth_users ?? counts.demo_users ?? "-"],
+    ["Memories", counts.memories ?? "-"],
   ]
     .map(
       ([label, value]) =>
@@ -4823,7 +4877,7 @@ function renderAdminOverview(body, stats, overview = {}) {
           <div class="admin-bar" title="${adminEsc(a.date)}: ${a.messages}">
             <span style="height:${Math.max(4, Math.round((a.messages / peak) * 72))}px"></span>
             <small>${adminEsc(a.date.slice(5))}</small>
-          </div>`).join("") : '<div class="admin-log-item"><time>—</time>No activity yet.</div>'}
+          </div>`).join("") : '<div class="admin-log-item"><time>-</time>No activity yet.</div>'}
       </div>
     </div>
     <div class="admin-section">
@@ -4871,7 +4925,7 @@ async function renderAdminChats(body, query = "") {
   const list = document.createElement("div");
   list.className = "admin-log-list";
   if (!rows.length) {
-    list.innerHTML = '<div class="admin-log-item"><time>—</time>No conversations found.</div>';
+    list.innerHTML = '<div class="admin-log-item"><time>-</time>No conversations found.</div>';
   }
   rows.forEach((convo) => {
     const item = document.createElement("div");
@@ -4908,7 +4962,7 @@ async function renderAdminChats(body, query = "") {
           detail.appendChild(row);
         });
         if (!data.messages?.length) {
-          detail.innerHTML = '<div class="admin-log-item"><time>—</time>No messages.</div>';
+          detail.innerHTML = '<div class="admin-log-item"><time>-</time>No messages.</div>';
         }
       } catch (error) {
         detail.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
@@ -5094,7 +5148,7 @@ async function renderAdminUsers(body) {
         badgeList.appendChild(row);
       });
       if (!all.badges?.length) {
-        badgeList.innerHTML = '<div class="admin-log-item"><time>—</time>No badges granted yet.</div>';
+        badgeList.innerHTML = '<div class="admin-log-item"><time>-</time>No badges granted yet.</div>';
       }
     } catch (error) {
       badgeList.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
@@ -5147,7 +5201,7 @@ async function renderAdminUsers(body) {
     );
   });
   if (!data.demo_users?.length) {
-    list.innerHTML = '<div class="admin-log-item"><time>—</time>No demo accounts.</div>';
+    list.innerHTML = '<div class="admin-log-item"><time>-</time>No demo accounts.</div>';
   }
   const supList = body.querySelector("#adminSupabaseUsers");
   (data.supabase_users || []).slice(0, 50).forEach((u) => {
@@ -5158,7 +5212,7 @@ async function renderAdminUsers(body) {
   if (!data.supabase_users?.length) {
     const empty = document.createElement("div");
     empty.className = "admin-log-item";
-    empty.innerHTML = "<time>—</time>";
+    empty.innerHTML = "<time>-</time>";
     const txt = document.createElement("span");
     txt.textContent = "Unavailable (needs service key or migration)";
     empty.appendChild(txt);
@@ -5180,8 +5234,8 @@ function renderAdminControls(body, stats) {
   const paintMaint = (on) => {
     maintBtn.textContent = on ? "Disable maintenance" : "Enable maintenance";
     maintNote.textContent = on
-      ? "ON — only admins can chat right now."
-      : "Off — everyone can chat.";
+      ? "ON - only admins can chat right now."
+      : "Off - everyone can chat.";
   };
   const maintNote = document.createElement("p");
   maintNote.className = "dropdown-hint";
@@ -5274,7 +5328,7 @@ async function renderAdminLogs(body) {
     list.appendChild(row);
   });
   if (!data.logs?.length) {
-    list.innerHTML = '<div class="admin-log-item"><time>—</time>No logs yet.</div>';
+    list.innerHTML = '<div class="admin-log-item"><time>-</time>No logs yet.</div>';
   }
   body.appendChild(list);
 }

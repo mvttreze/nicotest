@@ -47,18 +47,11 @@
 
   function migrateLegacyStore() {
     try {
-      // One-shot per device: only the first account to open the gallery with
-      // an empty scoped store inherits the pre-scoping images. The flag then
-      // freezes the legacy blob so no later account can inherit it too.
       if (localStorage.getItem(LEGACY_MIGRATED_FLAG)) return;
-      var legacy = localStorage.getItem(STORE_KEY_BASE);
-      if (!legacy) return;
-      var parsed = JSON.parse(legacy);
-      var current = localStorage.getItem(storeKey());
-      if (Array.isArray(parsed) && parsed.length && !current) {
-        items = parsed;
-        save();
-      }
+      // The old unscoped key has no owner metadata. Assigning it to the first
+      // account or guest to open Gallery could expose another user's images.
+      // Discard it once and only load data from an owner-scoped key.
+      localStorage.removeItem(STORE_KEY_BASE);
       localStorage.setItem(LEGACY_MIGRATED_FLAG, "1");
     } catch (error) { /* ignore */ }
   }
@@ -252,6 +245,23 @@
     viewer.dataset.id = id;
     viewer.hidden = false;
     grid.hidden = true;
+    updateViewerNav();
+  }
+
+  /* Move the viewer one item forward (+1) or back (-1), wrapping around. */
+  function stepViewer(delta) {
+    if (!viewer || viewer.hidden || !items.length) return;
+    var idx = items.findIndex(function (i) { return i.id === viewer.dataset.id; });
+    if (idx < 0) idx = 0;
+    var next = (idx + delta + items.length) % items.length;
+    openViewer(items[next].id);
+  }
+
+  function updateViewerNav() {
+    var prev = document.getElementById("galleryViewerPrev");
+    var next = document.getElementById("galleryViewerNext");
+    if (prev) prev.disabled = items.length < 2;
+    if (next) next.disabled = items.length < 2;
   }
 
   function closeViewer() {
@@ -321,6 +331,8 @@
     document.getElementById("galleryViewerClose").addEventListener("click", closeViewer);
     document.getElementById("galleryDownload").addEventListener("click", downloadCurrent);
     document.getElementById("galleryDelete").addEventListener("click", deleteCurrent);
+    document.getElementById("galleryViewerPrev").addEventListener("click", function () { stepViewer(-1); });
+    document.getElementById("galleryViewerNext").addEventListener("click", function () { stepViewer(1); });
     viewer.addEventListener("click", function (event) {
       if (event.target === viewer) closeViewer();
     });

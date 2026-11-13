@@ -1,4 +1,4 @@
-# Nico Mobile (Capacitor — Android + iOS)
+# Nico Mobile (Capacitor - Android + iOS)
 
 Electron equivalent for phones: wraps the existing Nico web app (repo root)
 in a native WebView. One web codebase, native shells for both stores.
@@ -8,7 +8,7 @@ in a native WebView. One web codebase, native shells for both stores.
 - Web source of truth stays at the repo root (`index.html`, `script.js`,
   `style.css`, `nico-redesign.css`, `nico-ui.js`, `sw.js`, icons).
 - `npm run sync:web` copies those into `nico-mobile/www/` (generated,
-  gitignored — never hand-edit).
+  gitignored - never hand-edit).
 - Capacitor (`capacitor.config.js`, `appId: dev.nico.os`) bundles `www/`
   into native Android/iOS apps. API calls still hit
   `https://nicotest-1.onrender.com` over https.
@@ -19,7 +19,7 @@ in a native WebView. One web codebase, native shells for both stores.
 
 - Node 20+ and npm
 - Android builds: Android Studio + SDK (works on Windows)
-- iOS builds: macOS + Xcode (Apple requirement — cannot build iOS on Windows)
+- iOS builds: macOS + Xcode (Apple requirement - cannot build iOS on Windows)
 
 ## Quickstart
 
@@ -51,7 +51,7 @@ Still TODO before store submission:
    Firebase (Android) + APNs (iOS) keys.
 3. **Icons/splash**: generate via `npx capacitor-assets` or Android
    Studio / Xcode asset catalogs (source: `icon-512.png`, `icon.svg`).
-4. **Apple review**: the app must not be a raw URL loader — it bundles `www/`
+4. **Apple review**: the app must not be a raw URL loader - it bundles `www/`
    (offline shell) with native chrome, which is why `server.url` is unset.
 
 ## Conventions

@@ -65,7 +65,7 @@ function buildTray() {
     return;
   }
   tray = new Tray(trayImage);
-  tray.setToolTip("Nico — personal AI assistant");
+  tray.setToolTip("Nico - personal AI assistant");
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -253,7 +253,7 @@ ipcMain.handle("nico:run-cli", async (_event, request) => {
   const cwd = nicoWorkspaceDir();
   const resolved = resolveBin(tool);
   if (!resolved) {
-    return { ok: false, error: `CLI '${tool}' not found — install it and retry` };
+    return { ok: false, error: `CLI '${tool}' not found - install it and retry` };
   }
   // .cmd/.bat shims ride one pre-quoted command string through the shell;
   // real binaries spawn directly with shell:false. Either way the task text
@@ -282,7 +282,7 @@ ipcMain.handle("nico:run-cli", async (_event, request) => {
     child.stderr?.on("data", (data) => { err += data.toString(); });
     child.on("error", () => resolve({
       ok: false,
-      error: `CLI '${tool}' not found — install it and retry`,
+      error: `CLI '${tool}' not found - install it and retry`,
     }));
     child.on("close", (code, signal) => {
       if (signal === "SIGTERM" && !out.trim()) {
@@ -290,7 +290,7 @@ ipcMain.handle("nico:run-cli", async (_event, request) => {
         return;
       }
       if (/is not recognized as an internal/i.test(err)) {
-        resolve({ ok: false, error: `CLI '${tool}' not found — install it and retry` });
+        resolve({ ok: false, error: `CLI '${tool}' not found - install it and retry` });
         return;
       }
       const output = (out + (err ? `\n[stderr]\n${err}` : "")).trim();

@@ -1,7 +1,7 @@
 // Capacitor config: native iOS + Android shell around the Nico web app.
 // Source of truth for web assets is the repo root (index.html, script.js,
 // style.css, ...). Run `npm run sync:web` to copy them into ./www before
-// `npx cap sync`. Do NOT hand-edit ./www — it is generated (gitignored).
+// `npx cap sync`. Do NOT hand-edit ./www - it is generated (gitignored).
 const config = {
   appId: "dev.nico.os",
   appName: "Nico",
