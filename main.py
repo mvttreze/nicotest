@@ -1,9 +1,13 @@
 import asyncio
 import base64
+import difflib
+import hashlib
 import io
 import json
 import os
 import re
+import tempfile
+import threading
 import uuid
 from datetime import datetime
 from urllib.parse import urlparse
@@ -497,6 +501,258 @@ def clear_admin_logs(authorization: str | None = Header(default=None)):
   require_admin(authorization)
   ADMIN_LOGS.clear()
   return {"status": "success"}
+
+
+# Patch management
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PATCH_STORE_DIR = os.path.join(
+  tempfile.gettempdir(),
+  "nico-patch-store-" + hashlib.sha256(BASE_DIR.encode("utf-8")).hexdigest()[:12],
+)
+PATCHES_PATH = os.path.join(PATCH_STORE_DIR, "patches.json")
+PATCH_MAX_BYTES = int(os.getenv("PATCH_MAX_BYTES", "1000000"))
+PATCH_LOCK = threading.Lock()
+_PATCHES: list[dict] = []
+PATCH_FILES = {
+  "index.html", "style.css", "nico-redesign.css", "script.js", "icons.js",
+  "settings-ui.js", "gallery.js", "artifacts.js", "panel-dismiss.js",
+  "nico-ui.js", "greetings.js",
+}
+
+
+def load_patches():
+  global _PATCHES
+  with PATCH_LOCK:
+    try:
+      with open(PATCHES_PATH, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+      _PATCHES = list(data.get("patches") or []) if isinstance(data, dict) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+      _PATCHES = []
+
+
+load_patches()
+
+
+def _atomic_write_json(path, payload):
+  os.makedirs(os.path.dirname(path), exist_ok=True)
+  fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", prefix=".patches-", suffix=".tmp")
+  try:
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+      json.dump(payload, fh, ensure_ascii=False, indent=2)
+      fh.flush()
+      os.fsync(fh.fileno())
+    os.replace(tmp, path)
+  except BaseException:
+    os.unlink(tmp)
+    raise
+
+
+def _persist_patches():
+  payload = {
+    "version": 1,
+    "patches": _PATCHES,
+    "meta": {"updated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z"},
+  }
+  _atomic_write_json(PATCHES_PATH, payload)
+
+
+def add_patch(record: dict) -> dict:
+  with PATCH_LOCK:
+    if supabase_client:
+      try:
+        supabase_client.table("developer_patches").insert({
+          "id": record["id"],
+          "created_at": record["created_at"],
+          "record": record,
+        }).execute()
+      except Exception as error:
+        raise HTTPException(status_code=503, detail="Patch storage is unavailable. Apply patches-migration.sql in Supabase.") from error
+    _PATCHES.insert(0, record)
+    if not supabase_client:
+      _persist_patches()
+  return record
+
+
+def read_patch_records() -> list[dict]:
+  if supabase_client:
+    try:
+      response = supabase_client.table("developer_patches").select("record").order("created_at", desc=True).limit(200).execute()
+      return [row["record"] for row in (response.data or []) if isinstance(row.get("record"), dict)]
+    except Exception as error:
+      raise HTTPException(status_code=503, detail="Patch storage is unavailable. Apply patches-migration.sql in Supabase.") from error
+  with PATCH_LOCK:
+    try:
+      with open(PATCHES_PATH, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+      records = data.get("patches", []) if isinstance(data, dict) else []
+      return records if isinstance(records, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+      return []
+
+
+def _resolve_restore_target(target: str):
+  if target not in PATCH_FILES:
+    raise HTTPException(status_code=403, detail="Target file is not patchable")
+  p = os.path.realpath(os.path.join(BASE_DIR, target))
+  if os.path.commonpath([BASE_DIR, p]) != BASE_DIR or not os.path.isfile(p):
+    raise HTTPException(status_code=404, detail="Target file does not exist")
+  return p
+
+
+def _atomic_write_text(path: str, content: str):
+  fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".nico-patch-", suffix=".tmp")
+  try:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
+      fh.write(content)
+      fh.flush()
+      os.fsync(fh.fileno())
+    os.replace(tmp, path)
+  except BaseException:
+    try:
+      os.unlink(tmp)
+    except OSError:
+      pass
+    raise
+
+
+class CreatePatchRequest(BaseModel):
+  target: str
+  description: str = Field(min_length=1, max_length=160)
+  content: str = Field(max_length=1000000)
+  confirm: bool
+
+
+class RestorePatchRequest(BaseModel):
+  confirm: bool
+  note: str = Field(default="", max_length=300)
+
+
+@app.get("/admin/patches")
+def admin_patches(
+  authorization: str | None = Header(default=None),
+  q: str | None = None,
+  limit: int = 20,
+  offset: int = 0,
+):
+  require_admin(authorization)
+  limit = max(1, min(limit, 50))
+  offset = max(0, offset)
+  items = read_patch_records()
+  if q:
+    needle = q.strip().lower()
+    items = [p for p in items if needle in p.get("description", "").lower() or needle in p.get("target", "").lower()]
+  summaries = [{key: p.get(key) for key in (
+    "id", "created_at", "author_email", "author_name", "target", "description",
+    "kind", "size_bytes", "parent_id",
+  )} for p in items[offset:offset + limit]]
+  return {"patches": summaries, "count": len(items), "targets": sorted(PATCH_FILES)}
+
+
+@app.get("/admin/patches/{patch_id}")
+def admin_patch_detail(patch_id: str, authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  for patch in read_patch_records():
+    if patch.get("id") == patch_id:
+      return patch
+  raise HTTPException(status_code=404, detail="Patch not found")
+
+
+@app.get("/admin/patches/{patch_id}/preview")
+def admin_patch_preview(patch_id: str, authorization: str | None = Header(default=None)):
+  require_admin(authorization)
+  patch = next((item for item in read_patch_records() if item.get("id") == patch_id), None)
+  if not patch:
+    raise HTTPException(status_code=404, detail="Patch not found")
+  path = _resolve_restore_target(patch.get("target", ""))
+  with open(path, "r", encoding="utf-8") as fh:
+    current = fh.read()
+  diff = "".join(difflib.unified_diff(
+    current.splitlines(keepends=True),
+    patch.get("content", "").splitlines(keepends=True),
+    fromfile=f"current/{patch['target']}",
+    tofile=f"saved/{patch['target']}",
+  ))
+  return {"patch_id": patch_id, "target": patch["target"], "diff": diff}
+
+
+@app.post("/admin/patches/{patch_id}/restore")
+def admin_restore_patch(
+  patch_id: str,
+  request: RestorePatchRequest,
+  authorization: str | None = Header(default=None),
+):
+  user = require_admin(authorization)
+  if not request.confirm:
+    raise HTTPException(status_code=400, detail="Restore confirmation required")
+
+  patch = None
+  for p in read_patch_records():
+    if p["id"] == patch_id:
+      patch = p
+      break
+  if not patch: raise HTTPException(status_code=404, detail="Patch not found")
+
+  target = patch.get("target")
+  path = _resolve_restore_target(target)
+  content = patch.get("content", "")
+  if hashlib.sha256(content.encode("utf-8")).hexdigest() != patch.get("content_sha256"):
+    raise HTTPException(status_code=400, detail="Patch integrity verification failed")
+  with open(path, "r", encoding="utf-8") as fh:
+    current = fh.read()
+  backup = {
+    "id": f"patch_{uuid.uuid4().hex[:16]}",
+    "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    "author_email": user.email,
+    "author_name": (user.user_metadata or {}).get("full_name") or "Admin",
+    "target": target,
+    "description": f"Before restore of {patch_id}",
+    "kind": "backup",
+    "content": current,
+    "content_sha256": hashlib.sha256(current.encode("utf-8")).hexdigest(),
+    "size_bytes": len(current.encode("utf-8")),
+    "parent_id": patch_id,
+  }
+  add_patch(backup)
+  _atomic_write_text(path, content)
+  add_admin_log(f"Restored patch {patch_id[:8]} ({target}); backup {backup['id'][:8]}")
+  return {"status": "success", "patch_id": patch_id, "backup_id": backup["id"], "target": target}
+
+
+@app.post("/admin/patches")
+def admin_create_patch(
+  request: CreatePatchRequest,
+  authorization: str | None = Header(default=None),
+):
+  user = require_admin(authorization)
+  if not request.confirm:
+    raise HTTPException(status_code=400, detail="Snapshot confirmation required")
+  if not request.description.strip():
+    raise HTTPException(status_code=422, detail="Snapshot note cannot be empty")
+  path = _resolve_restore_target(request.target)
+  if len(request.content.encode("utf-8")) > PATCH_MAX_BYTES:
+    raise HTTPException(status_code=413, detail="Patch content too large")
+  with open(path, "r", encoding="utf-8") as fh:
+    current = fh.read()
+  if hashlib.sha256(request.content.encode("utf-8")).hexdigest() != hashlib.sha256(current.encode("utf-8")).hexdigest():
+    raise HTTPException(status_code=409, detail="The served file differs from the backend source. Refresh and retry.")
+
+  record = {
+    "id": f"patch_{uuid.uuid4().hex[:16]}",
+    "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    "author_email": user.email,
+    "author_name": (user.user_metadata or {}).get("full_name") or "Admin",
+    "target": request.target,
+    "description": request.description.strip(),
+    "kind": "snapshot",
+    "content": current,
+    "content_sha256": hashlib.sha256(current.encode("utf-8")).hexdigest(),
+    "size_bytes": len(current.encode("utf-8")),
+  }
+  add_patch(record)
+  add_admin_log(f"Recorded patch {record['id'][:8]} ({request.target})")
+  return {key: record.get(key) for key in ("id", "created_at", "target", "description", "kind", "size_bytes")}
+
 
 
 def supa_count(table: str):

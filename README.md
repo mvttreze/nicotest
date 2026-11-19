@@ -8,7 +8,9 @@
 3. In the developer user's metadata, add `role: developer`. The backend also
    enforces the configured admin email.
 4. Run `auth-migration.sql` in the Supabase SQL editor.
-5. Configure these Render environment variables:
+5. Run `patches-migration.sql` in the Supabase SQL editor to enable persistent
+   developer source snapshots. Do not create a client-side policy for this table.
+6. Configure these Render environment variables:
 
 ```text
 SUPABASE_URL=https://your-project.supabase.co

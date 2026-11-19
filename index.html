@@ -23,7 +23,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
     <link rel="stylesheet" href="style.css?v=fix27">
-    <link rel="stylesheet" href="nico-redesign.css?v=fix35">
+    <link rel="stylesheet" href="nico-redesign.css?v=nico-v3-2">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
@@ -152,12 +152,6 @@
     <!-- Main Content Area -->
     <main class="main-content">
         <div class="announce-banner" id="announceBanner" role="status" hidden></div>
-        <div class="guest-prompt hidden" id="guestPrompt" aria-live="polite">
-            <svg class="guest-prompt-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.2" r="2.3"/><path d="M2.5 14c.6-2.7 2.4-4 5.5-4s4.9 1.3 5.5 4"/></svg>
-            <div class="guest-prompt-copy"><strong>Guest mode</strong><span>Sign in to save your chats to your account.</span></div>
-            <button class="guest-prompt-signin" id="guest-prompt-signin" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>Sign in</button>
-            <button class="guest-prompt-dismiss" id="guest-prompt-dismiss" type="button" aria-label="Dismiss guest mode banner"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
-        </div>
         <header class="top-header">
             <button class="mobile-menu-btn" id="menu-toggle" type="button" aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
             <div class="top-header-actions">
@@ -189,6 +183,12 @@
                 </button>
             </div>
         </header>
+        <div class="guest-prompt hidden" id="guestPrompt" aria-live="polite">
+            <svg class="guest-prompt-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5.2" r="2.3"/><path d="M2.5 14c.6-2.7 2.4-4 5.5-4s4.9 1.3 5.5 4"/></svg>
+            <div class="guest-prompt-copy"><strong>Guest mode</strong><span>Sign in to save your chats to your account.</span></div>
+            <button class="guest-prompt-signin" id="guest-prompt-signin" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>Sign in</button>
+            <button class="guest-prompt-dismiss" id="guest-prompt-dismiss" type="button" aria-label="Dismiss guest mode banner"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+        </div>
 
         <section class="settings-panel" id="settingsPanel" aria-hidden="true">
             <div class="settings-panel-header">
@@ -237,13 +237,13 @@
                             <small id="themeSettingLabel">Default</small>
                         </div>
                         <div class="theme-swatches" id="themeSwatches" role="radiogroup" aria-label="Theme">
-                            <button type="button" class="theme-swatch" data-theme="midnight" role="radio" aria-checked="true" aria-label="Default" style="--s1:#302c27;--s2:#211f1c;--s3:#c96442"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Default</em></button>
-                            <button type="button" class="theme-swatch" data-theme="cyberpunk" role="radio" aria-checked="false" aria-label="Cyberpunk neon" style="--s1:#0a0014;--s2:#2d0033;--s3:#ff2e9a"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Cyberpunk</em></button>
-                            <button type="button" class="theme-swatch" data-theme="sunset" role="radio" aria-checked="false" aria-label="Sunset orange" style="--s1:#1a0d06;--s2:#3d1a0a;--s3:#ff8a3d"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Sunset</em></button>
-                            <button type="button" class="theme-swatch" data-theme="aurora" role="radio" aria-checked="false" aria-label="Aurora glass" style="--s1:#04121a;--s2:#0b2e33;--s3:#5fd8c8"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Aurora</em></button>
-                            <button type="button" class="theme-swatch" data-theme="ocean" role="radio" aria-checked="false" aria-label="Deep ocean" style="--s1:#040d1c;--s2:#0a2140;--s3:#3d9bff"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Ocean</em></button>
-                            <button type="button" class="theme-swatch" data-theme="forest" role="radio" aria-checked="false" aria-label="Forest signal" style="--s1:#06120b;--s2:#12301c;--s3:#5fd37a"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Forest</em></button>
-                            <button type="button" class="theme-swatch" data-theme="graphite" role="radio" aria-checked="false" aria-label="Graphite studio" style="--s1:#141414;--s2:#242424;--s3:#b0b0b0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Graphite</em></button>
+                            <button type="button" class="theme-swatch" data-theme="midnight" role="radio" aria-checked="true" aria-label="Default" style="--s1:#28282c;--s2:#3f3f46;--s3:#e4e4e7"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Default</em></button>
+                            <button type="button" class="theme-swatch" data-theme="cyberpunk" role="radio" aria-checked="false" aria-label="Cyberpunk neon" style="--s1:#29292d;--s2:#414147;--s3:#e4e4e7"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Cyberpunk</em></button>
+                            <button type="button" class="theme-swatch" data-theme="sunset" role="radio" aria-checked="false" aria-label="Sunset orange" style="--s1:#303034;--s2:#48484e;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Sunset</em></button>
+                            <button type="button" class="theme-swatch" data-theme="aurora" role="radio" aria-checked="false" aria-label="Aurora glass" style="--s1:#39393e;--s2:#55555b;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Aurora</em></button>
+                            <button type="button" class="theme-swatch" data-theme="ocean" role="radio" aria-checked="false" aria-label="Deep ocean" style="--s1:#44444a;--s2:#626268;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Ocean</em></button>
+                            <button type="button" class="theme-swatch" data-theme="forest" role="radio" aria-checked="false" aria-label="Forest signal" style="--s1:#505056;--s2:#6d6d73;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Forest</em></button>
+                            <button type="button" class="theme-swatch" data-theme="graphite" role="radio" aria-checked="false" aria-label="Graphite studio" style="--s1:#5c5c63;--s2:#797980;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Graphite</em></button>
                         </div>
                         <select id="themeSetting" class="visually-hidden" tabindex="-1" aria-hidden="true">
                             <option value="midnight">Default</option>
@@ -346,7 +346,7 @@
                         <div class="vision-corner corner-top-left"></div><div class="vision-corner corner-top-right"></div><div class="vision-corner corner-bottom-left"></div><div class="vision-corner corner-bottom-right"></div>
                     </div>
                     <aside class="vision-controls" aria-label="Screen sharing controls">
-                        <div class="vision-control-heading"><span class="vision-control-icon">◉</span><strong>Live view</strong><small>Share controls</small></div>
+                        <div class="vision-control-heading"><span class="vision-control-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.5"/></svg></span><strong>Live view</strong><small>Share controls</small></div>
                         <button id="captureVisionBtn" class="vision-control secondary" type="button" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.5"/></svg>Capture frame</button>
                         <button id="analyzeVisionBtn" class="vision-control primary" type="button" disabled><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.5 4.2 4.2 1.5-4.2 1.5L8 13.2 6.5 9 2.3 7.5 6.5 6z"/></svg>Ask Nico</button>
                         <button id="stopVisionBtn" class="vision-control stop" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.2"/></svg>Stop sharing</button>

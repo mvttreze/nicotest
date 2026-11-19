@@ -61,6 +61,7 @@
     shield: '<path d="M8 1.8 13 4v3.5c0 3-1.8 5.2-5 6.7-3.2-1.5-5-3.7-5-6.7V4z"/><path d="m5.8 7.8 1.5 1.5 3-3"/>',
     cloud: '<path d="M4 12.5a3 3 0 0 1 .2-6A4.5 4.5 0 0 1 12.8 8 2.3 2.3 0 0 1 12 12.5z"/>',
     'download-cloud': '<path d="M4 11.5a3 3 0 0 1 .2-6A4.5 4.5 0 0 1 12.8 7 2.5 2.5 0 0 1 12 12h-1"/><path d="M8 8v5m-2-2 2 2 2-2"/>',
+    history: '<path d="M2.5 7.5A5.5 5.5 0 1 1 3 11"/><path d="M2.5 3.5v4h4M8 4.5V8l2.5 1.5"/>',
   };
 
   /**
@@ -153,6 +154,9 @@
     if (/copy|clipboard/.test(label)) return "copy";
     if (/download|export|save file/.test(label)) return "download";
     if (/upload|attach|add file|add photo/.test(label)) return "cloud-upload";
+    if (/snapshot|capture version/.test(label)) return "cloud-upload";
+    if (/preview|diff/.test(label)) return "eye";
+    if (/restore|history|patch/.test(label)) return "history";
     if (/search|find/.test(label)) return "search";
     if (/settings|preferences/.test(label)) return "settings";
     if (/reminder|notification|bell/.test(label)) return "bell";

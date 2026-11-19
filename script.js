@@ -940,7 +940,7 @@ function addSelectedFiles(kind, event) {
   const images = files.filter((file) => isImageFile(file));
   const others = files.filter((file) => !isImageFile(file));
   if (images.length) addImageAttachments(images);
-  const icon = kind === "code" ? "⌘" : "📄";
+  const icon = kind === "code" ? "braces" : "document";
   let added = 0;
   others.forEach((file) => {
     if (selectedAttachments.length >= 10) return;
@@ -1052,7 +1052,7 @@ async function addImageAttachments(imageFiles) {
     selectedAttachments.push({
       file: pastedFile,
       kind: "images",
-      icon: "🖼️",
+      icon: "image",
       previewUrl: URL.createObjectURL(pastedFile),
     });
     added += 1;
@@ -1113,7 +1113,9 @@ function addDroppedFiles(dataTransfer) {
       kind: /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(file.name) || (file.type || "").startsWith("text/")
         ? "code"
         : "files",
-      icon: "📄",
+      icon: /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(file.name) || (file.type || "").startsWith("text/")
+        ? "braces"
+        : "document",
       previewUrl: null,
     });
   });
@@ -2262,7 +2264,7 @@ function createConversationMenu(item, conversation) {
   const trigger = document.createElement("button");
   trigger.className = "conversation-menu-trigger";
   trigger.type = "button";
-  trigger.innerText = "⋮";
+  trigger.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="4" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="8" cy="12" r="1"/></svg>`;
   trigger.title = "Conversation actions";
   trigger.setAttribute("aria-label", "Conversation actions");
   trigger.setAttribute("aria-haspopup", "menu");
@@ -2273,12 +2275,15 @@ function createConversationMenu(item, conversation) {
   menu.hidden = true;
   menu.setAttribute("role", "menu");
 
-  const addMenuItem = (label, icon, handler, danger = false) => {
+  const addMenuItem = (label, iconName, handler, danger = false) => {
     const button = document.createElement("button");
     button.className = `conversation-menu-item${danger ? " danger" : ""}`;
     button.type = "button";
     button.setAttribute("role", "menuitem");
-    button.innerHTML = `<span class="conversation-menu-icon">${icon}</span><span>${label}</span>`;
+    const iconSvg = window.NicoIcons && window.NicoIcons.PATHS[iconName] ?
+        `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${window.NicoIcons.PATHS[iconName]}</svg>` :
+        iconName;
+    button.innerHTML = `<span class="conversation-menu-icon">${iconSvg}</span><span>${label}</span>`;
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
       closeConversationMenus();
@@ -2287,19 +2292,19 @@ function createConversationMenu(item, conversation) {
     menu.appendChild(button);
   };
 
-  addMenuItem("Share conversation", "↗", () =>
+  addMenuItem("Share conversation", "link", () =>
     shareConversation(conversation.id, conversation.title),
   );
   const isPinned = getPinnedConversationIds().includes(conversation.id);
-  addMenuItem(isPinned ? "Unpin" : "Pin", "⚑", () =>
+  addMenuItem(isPinned ? "Unpin" : "Pin", "bookmark", () =>
     setPinnedConversation(conversation.id, !isPinned),
   );
-  addMenuItem("Rename", "✎", (event) =>
+  addMenuItem("Rename", "type", (event) =>
     renameConversation(conversation.id, conversation.title, event),
   );
   addMenuItem(
     "Delete",
-    "⌫",
+    "trash",
     (event) => deleteConversation(conversation.id, event),
     true,
   );
@@ -4178,6 +4183,7 @@ function initializeSettingsPanel() {
       if (key === "personality") {
         syncDeveloperModePreference();
         if ((settings.personality === "mica" && !canUseMica()) ||
+            (settings.personality === "brainrot" && !canUseMica()) ||
             (settings.personality === "developer" && !isDeveloperAccountUser(currentUser))) {
           settings.personality = "professional";
           control.value = "professional";
@@ -4436,6 +4442,7 @@ function enforceMicaBadge() {
   if (!personalityControl) return;
   refreshPersonalityOptions();
   if ((settings.personality === "mica" && !canUseMica()) ||
+      (settings.personality === "brainrot" && !canUseMica()) ||
       (settings.personality === "developer" && !isDeveloperAccountUser(currentUser))) {
     settings.personality = "professional";
     personalityControl.value = "professional";
@@ -4448,12 +4455,15 @@ function refreshPersonalityOptions() {
   const personalityControl = document.getElementById("personalitySetting");
   if (!personalityControl) return;
   const micaOption = personalityControl.querySelector('option[value="mica"]');
+  const brainrotOption = personalityControl.querySelector('option[value="brainrot"]');
   const developerOption = personalityControl.querySelector('option[value="developer"]');
   if (micaOption) micaOption.hidden = !canUseMica();
+  if (brainrotOption) brainrotOption.hidden = !canUseMica();
   if (developerOption) developerOption.hidden = !isDeveloperAccountUser(currentUser);
   const micaBlocked = settings.personality === "mica" && !canUseMica();
+  const brainrotBlocked = settings.personality === "brainrot" && !canUseMica();
   const developerBlocked = settings.personality === "developer" && !isDeveloperAccountUser(currentUser);
-  if (micaBlocked || developerBlocked) {
+  if (micaBlocked || brainrotBlocked || developerBlocked) {
     settings.personality = "professional";
     personalityControl.value = "professional";
     saveSettings();
@@ -4881,17 +4891,22 @@ function renderAdminTabs(content, overview, stats) {
   const tabs = document.createElement("div");
   tabs.className = "admin-tabs";
   tabs.setAttribute("role", "tablist");
-  ["overview", "chats", "users", "controls", "logs"].forEach((name) => {
+  tabs.setAttribute("aria-label", "Developer dashboard sections");
+  ["overview", "chats", "users", "controls", "logs", "patches"].forEach((name) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `admin-tab${adminActiveTab === name ? " is-active" : ""}`;
     btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
     btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", String(adminActiveTab === name));
+    btn.setAttribute("aria-controls", "adminTabBody");
     btn.addEventListener("click", async () => {
       adminActiveTab = name;
-      tabs.querySelectorAll(".admin-tab").forEach((t) =>
-        t.classList.toggle("is-active", t === btn),
-      );
+      tabs.querySelectorAll(".admin-tab").forEach((tab) => {
+        const selected = tab === btn;
+        tab.classList.toggle("is-active", selected);
+        tab.setAttribute("aria-selected", String(selected));
+      });
       await renderAdminTab(content, name, stats, overview);
     });
     tabs.appendChild(btn);
@@ -4912,6 +4927,7 @@ async function renderAdminTab(content, name, stats, overview) {
     if (name === "users") return await renderAdminUsers(body);
     if (name === "controls") return renderAdminControls(body, stats);
     if (name === "logs") return await renderAdminLogs(body);
+    if (name === "patches") return await renderAdminPatches(body);
   } catch (error) {
     body.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
   }
@@ -5455,6 +5471,130 @@ document
 document
   .getElementById("guest-prompt-dismiss")
   ?.addEventListener("click", hideGuestSignInPrompt);
+async function renderAdminPatches(body) {
+  body.innerHTML = `<div class="admin-loading">Loading patches...</div>`;
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/admin/patches`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Failed to load patches (${res.status})`);
+    const targets = data.targets || [];
+    const patches = data.patches || [];
+    const targetOptions = targets.map((target) => `<option value="${adminEsc(target)}">${adminEsc(target)}</option>`).join("");
+    const cards = patches.map((patch) => `
+      <article class="patch-card" data-patch-card="${adminEsc(patch.id)}">
+        <div class="patch-card-heading">
+          <div><strong>${adminEsc(patch.target || "Source snapshot")}</strong><span class="patch-kind">${adminEsc(patch.kind || "snapshot")}</span></div>
+          <time>${adminEsc(patch.created_at || "")}</time>
+        </div>
+        <p>${adminEsc(patch.description || "")}</p>
+        <div class="patch-meta">${adminEsc(patch.author_name || patch.author_email || "Developer")} · ${Number(patch.size_bytes || 0).toLocaleString()} bytes</div>
+        <div class="patch-actions">
+          <button type="button" class="patch-preview-btn" data-patch-preview="${adminEsc(patch.id)}" aria-expanded="false">Preview diff</button>
+          <button type="button" class="patch-restore-btn" data-patch-restore="${adminEsc(patch.id)}">Restore snapshot</button>
+        </div>
+        <pre class="patch-diff" data-patch-diff hidden></pre>
+      </article>`).join("");
+
+    body.innerHTML = `
+      <section class="patch-manager">
+        <header class="patch-manager-heading"><div><h3>Patches</h3><p>Save source snapshots, inspect changes, and restore a previous UI or client-code version.</p></div></header>
+        <form class="patch-capture" id="patchCaptureForm">
+          <label>Source file<select name="target" required><option value="" disabled selected>Choose a file</option>${targetOptions}</select></label>
+          <label>Snapshot note<input name="description" maxlength="160" required placeholder="Describe this version"></label>
+          <button type="submit">Capture snapshot</button>
+        </form>
+        <p class="patch-storage-note">Restores create a backup first. Restored frontend files may need a site redeploy before visitors see the change.</p>
+        <div class="patch-list">${cards || `<div class="patch-empty"><strong>No patches yet</strong><span>Capture a source file to start a version history.</span></div>`}</div>
+      </section>`;
+
+    body.querySelector("#patchCaptureForm")?.addEventListener("submit", recordPatchSnapshot);
+    body.querySelectorAll("[data-patch-preview]").forEach((button) => {
+      button.addEventListener("click", () => previewPatch(button));
+    });
+    body.querySelectorAll("[data-patch-restore]").forEach((button) => {
+      button.addEventListener("click", () => handleRestorePatch(button.dataset.patchRestore));
+    });
+  } catch (error) {
+    body.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
+  }
+}
+
+async function previewPatch(button) {
+  const patchId = button.dataset.patchPreview;
+  const card = button.closest("[data-patch-card]");
+  const output = card?.querySelector("[data-patch-diff]");
+  if (!output) return;
+  if (!output.hidden) {
+    output.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    return;
+  }
+  button.disabled = true;
+  button.textContent = "Loading diff...";
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/admin/patches/${encodeURIComponent(patchId)}/preview`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `Failed to preview patch (${res.status})`);
+    output.textContent = data.diff || "No differences from the current file.";
+    output.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+  } catch (error) {
+    output.textContent = error.message;
+    output.hidden = false;
+  } finally {
+    button.disabled = false;
+    button.textContent = output.hidden ? "Preview diff" : "Hide diff";
+  }
+}
+
+async function handleRestorePatch(patchId) {
+  if (!confirm("Restore this saved source file? Nico will first save the current version as a backup.")) return;
+  try {
+    const res = await apiFetch(`${apiBaseUrl}/admin/patches/${encodeURIComponent(patchId)}/restore`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: true, note: "Restored from Developer Dashboard" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Restore failed");
+    showComposerToast(`Restored. Backup ${data.backup_id} was saved.`);
+    const body = document.getElementById("adminTabBody");
+    if (body) await renderAdminPatches(body);
+  } catch (error) {
+    alert(`Restore error: ${error.message}`);
+  }
+}
+
+async function recordPatchSnapshot(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const target = form.elements.target.value;
+  const description = form.elements.description.value.trim();
+  const submit = form.querySelector('[type="submit"]');
+  if (!target || !description) return;
+  submit.disabled = true;
+  submit.textContent = "Capturing...";
+  try {
+    const fileResponse = await fetch(new URL(target, window.location.href), { cache: "no-store" });
+    if (!fileResponse.ok) throw new Error(`Cannot read ${target} from this web build.`);
+    const content = await fileResponse.text();
+    const res = await apiFetch(`${apiBaseUrl}/admin/patches`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target, description, content, confirm: true }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Snapshot failed");
+    showComposerToast("Source snapshot captured.");
+    const body = document.getElementById("adminTabBody");
+    if (body) await renderAdminPatches(body);
+  } catch (error) {
+    alert(`Snapshot error: ${error.message}`);
+    submit.disabled = false;
+    submit.textContent = "Capture snapshot";
+  }
+}
+
 document
   .getElementById("openAdminDashboardBtn")
   ?.addEventListener("click", openDeveloperDashboard);
