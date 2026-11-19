@@ -38,6 +38,8 @@ body .welcome-container::before{content:"";position:absolute;left:50%;top:38%;wi
 body .welcome-title{font-family:var(--display);font-weight:700;font-size:clamp(2.5rem,6.2vw,4.4rem);line-height:1.04;letter-spacing:-.03em;background:linear-gradient(100deg,#fff 0%,#ffd6ec 28%,var(--accent) 62%,#8fe9ff 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 body .welcome-subtitle{font-size:1.15rem;opacity:.72;margin-top:.4rem}
 .welcome-suggestions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:1.6rem}
+.welcome-suggestions [data-react-fallback]{display:contents}
+.welcome-suggestions [data-react-fallback].react-mounted{display:none!important}
 .welcome-suggestions button{font:500 .92rem var(--ui);color:inherit;border:1px solid transparent;border-radius:999px;padding:.6rem 1.1rem;cursor:pointer;background:linear-gradient(var(--surface),var(--surface)) padding-box,var(--ring) border-box;transition:transform .2s,box-shadow .2s}
 .welcome-suggestions button:hover{transform:translateY(-2px);box-shadow:0 8px 24px var(--accent-glow)}
 
@@ -3156,30 +3158,6 @@ body.theme-light {
   --shadow-soft: 0 14px 38px rgba(24, 24, 27, 0.09);
   color: var(--text-primary);
 }
-body:not(.theme-light).theme-cyberpunk,
-body:not(.theme-light).theme-sunset,
-body:not(.theme-light).theme-aurora,
-body:not(.theme-light).theme-ocean,
-body:not(.theme-light).theme-forest,
-body:not(.theme-light).theme-graphite,
-body:not(.theme-light).theme-cotton-candy,
-body:not(.theme-light).theme-brainrot {
-  --bg-main: #111113;
-  --bg-accent: rgba(32, 32, 35, 0.88);
-  --surface: rgba(30, 30, 33, 0.82);
-  --panel: rgba(255, 255, 255, 0.055);
-  --line: rgba(255, 255, 255, 0.13);
-  --accent: #e4e4e7;
-  --accent-2: #f4f4f5;
-  --accent-glow: rgba(255, 255, 255, 0.06);
-  --grad: #e4e4e7;
-  --glass-bg: rgba(255, 255, 255, 0.055);
-  --glass-bg-hover: rgba(255, 255, 255, 0.09);
-  --glass-bg-active: rgba(255, 255, 255, 0.12);
-  --text-primary: #f4f4f5;
-  --text-muted: #b8b8bf;
-  --text-faint: #85858d;
-}
 body:not(.custom-background) {
   background: var(--bg-main) !important;
   background-image: none !important;
@@ -3375,28 +3353,69 @@ body textarea:focus-visible {
 
 /* Glisse-inspired liquid glass material, adapted for Nico's vanilla UI. */
 :root {
-  --nico-glass-surface: rgba(38, 38, 42, 0.70);
-  --nico-glass-control: rgba(255, 255, 255, 0.045);
-  --nico-glass-control-hover: rgba(255, 255, 255, 0.09);
-  --nico-glass-rim: rgba(255, 255, 255, 0.16);
-  --nico-glass-blur: 14px;
-  --nico-glass-saturation: 1.16;
-  --nico-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.025), var(--shadow-soft);
+  --nico-glass-surface: rgba(20, 24, 38, 0.48);
+  --nico-glass-tint: #6ea8ff;
+  --nico-glass-control: rgba(255, 255, 255, 0.075);
+  --nico-glass-control-hover: rgba(255, 255, 255, 0.14);
+  --nico-glass-rim: rgba(255, 255, 255, 0.24);
+  --nico-glass-blur: 26px;
+  --nico-glass-saturation: 1.65;
+  --nico-glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.045),
+    0 24px 70px rgba(0, 0, 0, 0.28),
+    0 0 38px color-mix(in srgb, var(--nico-glass-tint) 14%, transparent);
+  --nico-glass-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.035) 36%,
+    transparent 64%,
+    color-mix(in srgb, var(--nico-glass-tint) 12%, transparent)
+  );
 }
 body {
   --surface: var(--nico-glass-surface);
   --line: var(--nico-glass-rim);
 }
+body.theme-cyberpunk { --nico-glass-tint: #67f7d1; }
+body.theme-sunset { --nico-glass-tint: #ff9f68; }
+body.theme-aurora { --nico-glass-tint: #72f1c5; }
+body.theme-ocean { --nico-glass-tint: #62b8ff; }
+body.theme-forest { --nico-glass-tint: #a7e46f; }
+body.theme-graphite { --nico-glass-tint: #d7dbe3; }
+body.theme-cotton-candy { --nico-glass-tint: #ff9fd7; }
+body.theme-brainrot { --nico-glass-tint: #b6f36b; }
+body:not(.custom-background) {
+  background:
+    radial-gradient(54rem 38rem at 7% 4%, color-mix(in srgb, var(--nico-glass-tint) 27%, transparent), transparent 68%),
+    radial-gradient(48rem 34rem at 96% 18%, color-mix(in srgb, var(--nico-glass-tint) 21%, transparent), transparent 70%),
+    radial-gradient(50rem 34rem at 52% 110%, color-mix(in srgb, var(--nico-glass-tint) 15%, transparent), transparent 72%),
+    var(--bg-main) !important;
+}
+body .app-layout {
+  background: transparent !important;
+}
 body.theme-light {
-  --nico-glass-surface: rgba(255, 255, 255, 0.72);
-  --nico-glass-control: rgba(24, 24, 27, 0.035);
-  --nico-glass-control-hover: rgba(24, 24, 27, 0.075);
-  --nico-glass-rim: rgba(24, 24, 27, 0.14);
-  --nico-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(24, 24, 27, 0.025), var(--shadow-soft);
+  --nico-glass-surface: rgba(247, 250, 255, 0.68);
+  --nico-glass-tint: #94acd1;
+  --nico-glass-control: rgba(255, 255, 255, 0.42);
+  --nico-glass-control-hover: rgba(255, 255, 255, 0.72);
+  --nico-glass-rim: rgba(44, 58, 78, 0.18);
+  --nico-glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    inset 0 -1px 0 rgba(24, 36, 54, 0.045),
+    0 24px 70px rgba(37, 52, 74, 0.16),
+    0 0 38px color-mix(in srgb, var(--nico-glass-tint) 14%, transparent);
+  --nico-glass-sheen: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.84),
+    rgba(255, 255, 255, 0.28) 36%,
+    transparent 64%,
+    color-mix(in srgb, var(--nico-glass-tint) 10%, transparent)
+  );
   --line: var(--nico-glass-rim);
 }
+
 body .sidebar,
 body .input-pill,
 body .settings-panel,
@@ -3409,52 +3428,147 @@ body .add-files-dropdown,
 body .export-dropdown,
 body .reminder-dropdown,
 body .auth-card,
-body .guest-prompt {
+body .guest-prompt,
+body .vision-frame,
+body .conversation-menu {
   background-color: var(--nico-glass-surface) !important;
-  background-image: none !important;
+  background-image: var(--nico-glass-sheen) !important;
   border-color: var(--nico-glass-rim) !important;
   box-shadow: var(--nico-glass-shadow);
-  -webkit-backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation));
-  backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation));
+  -webkit-backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation)) contrast(1.04) !important;
+  backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation)) contrast(1.04) !important;
   transition: background-color 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
 }
+
+body .auth-screen {
+  color: var(--text-primary);
+  background:
+    radial-gradient(40rem 28rem at 50% 30%, var(--accent-glow), transparent 70%),
+    rgba(5, 3, 12, 0.24) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  backdrop-filter: blur(8px) saturate(1.2);
+}
+body.theme-light .auth-screen {
+  background:
+    radial-gradient(40rem 28rem at 50% 30%, var(--accent-glow), transparent 70%),
+    rgba(233, 239, 248, 0.22) !important;
+}
+body .auth-card h1,
+body .auth-card .auth-field span,
+body .auth-card .auth-row label {
+  color: var(--text-primary);
+}
+
 body .icon-btn,
 body .top-header-actions button,
-body .settings-tabs .settings-tab,
+body button.mobile-menu-btn,
+body .settings-btn,
+body .quick-link,
+body .settings-tabs .settings-tab:not(.is-active):not([aria-selected="true"]),
 body .welcome-suggestions button,
+body .dropdown-item,
+body .settings-action-btn,
+body .vision-control:not(.primary),
+body .admin-close-btn,
+body .credits-x,
+body .palette-hint,
 body .patch-actions button,
-body .patch-capture button {
+body .patch-capture button,
+body .conversation-menu-item {
   background-color: var(--nico-glass-control);
+  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.015) 72%, color-mix(in srgb, var(--nico-glass-tint) 8%, transparent));
   border-color: var(--nico-glass-rim);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  -webkit-backdrop-filter: blur(10px) saturate(var(--nico-glass-saturation));
-  backdrop-filter: blur(10px) saturate(var(--nico-glass-saturation));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
+  -webkit-backdrop-filter: blur(12px) saturate(var(--nico-glass-saturation));
+  backdrop-filter: blur(12px) saturate(var(--nico-glass-saturation));
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 body .icon-btn:hover:not(:disabled),
 body .top-header-actions button:hover:not(:disabled),
-body .settings-tabs .settings-tab:hover:not(:disabled),
+body button.mobile-menu-btn:hover:not(:disabled),
+body .settings-btn:hover:not(:disabled),
+body .quick-link:hover:not(:disabled),
+body .settings-tabs .settings-tab:hover:not(:disabled):not(.is-active):not([aria-selected="true"]),
 body .welcome-suggestions button:hover:not(:disabled),
+body .dropdown-item:hover:not(:disabled),
+body .settings-action-btn:hover:not(:disabled),
+body .vision-control:not(.primary):hover:not(:disabled),
+body .admin-close-btn:hover:not(:disabled),
+body .credits-x:hover:not(:disabled),
+body .palette-hint:hover:not(:disabled),
 body .patch-actions button:hover:not(:disabled),
-body .patch-capture button:hover:not(:disabled) {
+body .patch-capture button:hover:not(:disabled),
+body .conversation-menu-item:hover:not(:disabled) {
   background-color: var(--nico-glass-control-hover);
+  border-color: color-mix(in srgb, var(--nico-glass-tint) 38%, var(--nico-glass-rim));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 22px color-mix(in srgb, var(--nico-glass-tint) 16%, transparent);
+}
+body .settings-tabs .settings-tab.is-active,
+body .settings-tabs .settings-tab[aria-selected="true"],
+body .palette-item.is-active {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 5px 18px color-mix(in srgb, var(--nico-glass-tint) 24%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+}
+
+body .auth-card input,
+body .settings-panel select,
+body .settings-panel input[type="text"],
+body .settings-panel textarea,
+body .palette-input {
+  background-color: var(--nico-glass-control);
   border-color: var(--nico-glass-rim);
+  -webkit-backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
+  backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
 }
 body .new-chat-btn,
 body .send-btn,
-body .auth-primary-btn {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+body .auth-primary-btn,
+body .vision-control.primary {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+    0 10px 28px color-mix(in srgb, var(--accent) 24%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
 }
+body .message.user {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--nico-glass-tint) 24%, transparent),
+    color-mix(in srgb, var(--nico-glass-tint) 11%, transparent)
+  ) !important;
+  border-color: color-mix(in srgb, var(--nico-glass-tint) 42%, transparent) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.45);
+  backdrop-filter: blur(16px) saturate(1.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.19),
+    0 10px 30px color-mix(in srgb, var(--nico-glass-tint) 18%, transparent);
+}
+body .patch-card,
+body .credits-row {
+  background-color: var(--nico-glass-control);
+  background-image: var(--nico-glass-sheen);
+  border-color: var(--nico-glass-rim);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.12);
+  -webkit-backdrop-filter: blur(16px) saturate(var(--nico-glass-saturation));
+  backdrop-filter: blur(16px) saturate(var(--nico-glass-saturation));
+}
+
 @media (max-width: 768px) {
-  :root { --nico-glass-blur: 8px; }
+  :root { --nico-glass-blur: 18px; }
   body .icon-btn,
   body .top-header-actions button,
+  body button.mobile-menu-btn,
+  body .settings-btn,
   body .settings-tabs .settings-tab,
   body .welcome-suggestions button,
+  body .dropdown-item,
   body .patch-actions button,
   body .patch-capture button {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
+    -webkit-backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
+    backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
   }
 }
 @media (prefers-reduced-transparency: reduce) {
@@ -3471,7 +3585,33 @@ body .auth-primary-btn {
   body .export-dropdown,
   body .reminder-dropdown,
   body .auth-card,
-  body .guest-prompt {
+  body .guest-prompt,
+  body .vision-frame,
+  body .conversation-menu,
+  body .icon-btn,
+  body .top-header-actions button,
+  body button.mobile-menu-btn,
+  body .settings-btn,
+  body .quick-link,
+  body .settings-tabs .settings-tab,
+  body .welcome-suggestions button,
+  body .dropdown-item,
+  body .settings-action-btn,
+  body .vision-control,
+  body .admin-close-btn,
+  body .credits-x,
+  body .palette-hint,
+  body .patch-actions button,
+  body .patch-capture button,
+  body .conversation-menu-item,
+  body .auth-card input,
+  body .settings-panel select,
+  body .settings-panel input[type="text"],
+  body .settings-panel textarea,
+  body .palette-input,
+  body .message.user,
+  body .patch-card,
+  body .credits-row {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
     background-color: var(--bg-accent) !important;
@@ -3490,8 +3630,10 @@ body .auth-primary-btn {
   body .export-dropdown,
   body .reminder-dropdown,
   body .auth-card,
-  body .guest-prompt {
-    background-color: #202023 !important;
+  body .guest-prompt,
+  body .vision-frame,
+  body .conversation-menu {
+    background-color: #202532 !important;
   }
   body.theme-light .sidebar,
   body.theme-light .input-pill,
@@ -3505,7 +3647,113 @@ body .auth-primary-btn {
   body.theme-light .export-dropdown,
   body.theme-light .reminder-dropdown,
   body.theme-light .auth-card,
-  body.theme-light .guest-prompt {
-    background-color: #fff !important;
+  body.theme-light .guest-prompt,
+  body.theme-light .vision-frame,
+  body.theme-light .conversation-menu {
+    background-color: #f7faff !important;
   }
+}
+
+/* Keep the sidebar visually joined to the main column and quick access unboxed. */
+body .sidebar {
+  border-radius: 0 var(--r-lg) var(--r-lg) 0 !important;
+}
+
+body .sidebar-quick .quick-link {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body .sidebar-quick .quick-link:hover:not(:disabled) {
+  background-color: var(--nico-glass-control-hover) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* The selected settings section stays white regardless of the active theme. */
+body .settings-tab-indicator {
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14) !important;
+}
+body .settings-tabs .settings-tab.is-active,
+body .settings-tabs .settings-tab[aria-selected="true"] {
+  background: #fff !important;
+  background-image: none !important;
+  color: #191919 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 4px 14px rgba(0, 0, 0, 0.14) !important;
+}
+
+/* Align toolbar icons and labels on a consistent button box. */
+body .top-header-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  line-height: 1;
+}
+body .top-header-actions > .icon-btn {
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  flex: 0 0 38px;
+}
+body .top-header-actions > .export-btn {
+  min-width: 82px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+body .top-header-actions > button > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+body .input-pill .add-btn {
+  align-self: center;
+}
+body .custom-theme-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+body .custom-theme-actions .settings-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+body .settings-actions button,
+body .settings-auth-actions .auth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+body .vision-launch-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 40px;
+  padding-right: 40px;
+  text-align: center;
+}
+body .vision-launch-btn > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+body .settings-actions button[hidden],
+body .settings-auth-actions .auth-btn[hidden] {
+  display: none !important;
 }

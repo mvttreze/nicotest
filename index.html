@@ -23,7 +23,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
     <link rel="stylesheet" href="style.css?v=fix27">
-    <link rel="stylesheet" href="nico-redesign.css?v=nico-v3-3">
+    <link rel="stylesheet" href="nico-redesign.css?v=nico-v3-8">
+    <link rel="stylesheet" href="nico-react/dist/nico-react-ui.css?v=react-ui-1">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
@@ -160,7 +161,7 @@
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8M5 7l3 3 3-3"/><path d="M2.5 12.5h11"/></svg>
                     Export
                 </button>
-                <span class="model-badge">Nico v2 • System OS</span>
+                <span class="model-badge">Nico v3 • System OS</span>
             </div>
             <div class="reminder-dropdown" id="reminderDropdown" aria-hidden="true"></div>
             <div class="export-dropdown" id="exportDropdown" aria-hidden="true" role="menu" aria-label="Export chat">
@@ -238,12 +239,12 @@
                         </div>
                         <div class="theme-swatches" id="themeSwatches" role="radiogroup" aria-label="Theme">
                             <button type="button" class="theme-swatch" data-theme="midnight" role="radio" aria-checked="true" aria-label="Default" style="--s1:#28282c;--s2:#3f3f46;--s3:#e4e4e7"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Default</em></button>
-                            <button type="button" class="theme-swatch" data-theme="cyberpunk" role="radio" aria-checked="false" aria-label="Cyberpunk neon" style="--s1:#29292d;--s2:#414147;--s3:#e4e4e7"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Cyberpunk</em></button>
-                            <button type="button" class="theme-swatch" data-theme="sunset" role="radio" aria-checked="false" aria-label="Sunset orange" style="--s1:#303034;--s2:#48484e;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Sunset</em></button>
-                            <button type="button" class="theme-swatch" data-theme="aurora" role="radio" aria-checked="false" aria-label="Aurora glass" style="--s1:#39393e;--s2:#55555b;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Aurora</em></button>
-                            <button type="button" class="theme-swatch" data-theme="ocean" role="radio" aria-checked="false" aria-label="Deep ocean" style="--s1:#44444a;--s2:#626268;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Ocean</em></button>
-                            <button type="button" class="theme-swatch" data-theme="forest" role="radio" aria-checked="false" aria-label="Forest signal" style="--s1:#505056;--s2:#6d6d73;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Forest</em></button>
-                            <button type="button" class="theme-swatch" data-theme="graphite" role="radio" aria-checked="false" aria-label="Graphite studio" style="--s1:#5c5c63;--s2:#797980;--s3:#f4f4f5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Graphite</em></button>
+                            <button type="button" class="theme-swatch" data-theme="cyberpunk" role="radio" aria-checked="false" aria-label="Cyberpunk neon" style="--s1:#102b25;--s2:#1d584a;--s3:#67f7d1"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Cyberpunk</em></button>
+                            <button type="button" class="theme-swatch" data-theme="sunset" role="radio" aria-checked="false" aria-label="Sunset orange" style="--s1:#382318;--s2:#75462e;--s3:#ff9f68"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Sunset</em></button>
+                            <button type="button" class="theme-swatch" data-theme="aurora" role="radio" aria-checked="false" aria-label="Aurora glass" style="--s1:#08151b;--s2:#112a32;--s3:#72f1c5"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Aurora</em></button>
+                            <button type="button" class="theme-swatch" data-theme="ocean" role="radio" aria-checked="false" aria-label="Deep ocean" style="--s1:#06111e;--s2:#0a1e31;--s3:#62b8ff"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Ocean</em></button>
+                            <button type="button" class="theme-swatch" data-theme="forest" role="radio" aria-checked="false" aria-label="Forest signal" style="--s1:#0b1510;--s2:#122417;--s3:#a7e46f"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Forest</em></button>
+                            <button type="button" class="theme-swatch" data-theme="graphite" role="radio" aria-checked="false" aria-label="Graphite studio" style="--s1:#111214;--s2:#1e2228;--s3:#d7dbe3"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg><span></span><em>Graphite</em></button>
                         </div>
                         <select id="themeSetting" class="visually-hidden" tabindex="-1" aria-hidden="true">
                             <option value="midnight">Default</option>
@@ -377,11 +378,14 @@
                 <h1 class="welcome-title" id="welcomeTitle">Hello, <span class="welcome-name" id="welcomeName">User</span></h1>
                 <p class="welcome-subtitle" id="welcomeSubtitle">Start a conversation</p>
                 <div class="welcome-suggestions">
-                    <button type="button" data-prompt="Help me debug this code: "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5.5 4-3 4 3 4m5-8 3 4-3 4M9 3l-2 10"/></svg>Debug some code</button>
-                    <button type="button" data-prompt="Explain this simply: "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>Explain something</button>
-                    <button type="button" data-prompt="Help me plan my day: "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="12" height="10" rx="1.5"/><path d="M5 2v3m6-3v3M2 6.5h12"/></svg>Plan my day</button>
-                    <button type="button" data-prompt="Write a message to "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12v8H7l-4 3v-3H2z"/><path d="M5 6h6M5 8.5h4"/></svg>Draft a message</button>
-                    <button type="button" data-prompt="Briefing"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5a4 4 0 0 1 8 0c0 3 1 4 1 4H3s1-1 1-4z"/><path d="M6.5 13a1.6 1.6 0 0 0 3 0"/></svg>Morning briefing</button>
+                    <div data-react-fallback>
+                        <button type="button" data-prompt="Help me debug this code: "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5.5 4-3 4 3 4m5-8 3 4-3 4M9 3l-2 10"/></svg>Debug some code</button>
+                        <button type="button" data-prompt="Explain this simply: "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2.5h10v11H3zM5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>Explain something</button>
+                        <button type="button" data-prompt="Help me plan my day: "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3.5" width="12" height="10" rx="1.5"/><path d="M5 2v3m6-3v3M2 6.5h12"/></svg>Plan my day</button>
+                        <button type="button" data-prompt="Write a message to "><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h12v8H7l-4 3v-3H2z"/><path d="M5 6h6M5 8.5h4"/></svg>Draft a message</button>
+                        <button type="button" data-prompt="Briefing"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5a4 4 0 0 1 8 0c0 3 1 4 1 4H3s1-1 1-4z"/><path d="M6.5 13a1.6 1.6 0 0 0 3 0"/></svg>Morning briefing</button>
+                    </div>
+                    <div id="reactWelcomeSuggestions"></div>
                 </div>
             </div>
 
@@ -518,6 +522,7 @@
 <script src="settings-ui.js?v=fix31"></script>
 <script src="greetings.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
+<script defer src="nico-react/dist/nico-react-ui.js?v=react-ui-1"></script>
 <script>
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js");

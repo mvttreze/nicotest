@@ -6,9 +6,10 @@ in a native WebView. One web codebase, native shells for both stores.
 ## How it works
 
 - Web source of truth stays at the repo root (`index.html`, `script.js`,
-  `style.css`, `nico-redesign.css`, `nico-ui.js`, `sw.js`, icons).
-- `npm run sync:web` copies those into `nico-mobile/www/` (generated,
-  gitignored - never hand-edit).
+  `style.css`, `nico-redesign.css`, `nico-ui.js`, `sw.js`, icons), with the
+  React UI island maintained in the sibling `nico-react/` folder.
+- `npm run sync:web` builds that island and copies everything into
+  `nico-mobile/www/` (generated, gitignored - never hand-edit).
 - Capacitor (`capacitor.config.js`, `appId: dev.nico.os`) bundles `www/`
   into native Android/iOS apps. API calls still hit
   `https://nicotest-1.onrender.com` over https.
@@ -26,6 +27,7 @@ in a native WebView. One web codebase, native shells for both stores.
 ```sh
 cd nico-mobile
 npm install
+npm --prefix ../nico-react ci
 npm run sync:web
 npx cap add android   # once per machine (creates android/, gitignored)
 npx cap add ios       # once per machine, on a Mac (creates ios/, gitignored)
@@ -35,7 +37,8 @@ npx cap open ios      # Xcode (Mac only)
 ```
 
 After any web change at the repo root, re-run `npm run sync` before
-rebuilding in Android Studio / Xcode.
+rebuilding in Android Studio / Xcode. This also builds the React UI island
+from `../nico-react/` before copying the web app.
 
 ## Native features
 

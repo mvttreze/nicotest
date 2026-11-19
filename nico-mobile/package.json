@@ -4,7 +4,8 @@
   "private": true,
   "description": "Capacitor wrapper for Nico (Android + iOS) around the repo-root web app",
   "scripts": {
-    "sync:web": "node scripts/sync-web.js",
+    "build:react": "npm --prefix ../nico-react run build",
+    "sync:web": "npm run build:react && node scripts/sync-web.js",
     "sync": "npm run sync:web && npx cap sync",
     "add:android": "npx cap add android",
     "add:ios": "npx cap add ios",

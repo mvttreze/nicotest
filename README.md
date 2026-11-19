@@ -38,3 +38,25 @@ the Supabase Auth site URL and redirect URL to the deployed frontend URL.
 After deployment, verify `/health`, sign in as `admin`, and confirm the
 developer dashboard appears. Never expose the service-role key in frontend
 HTML or client-side JavaScript.
+
+## React UI island
+
+Nico remains a static HTML/CSS/JavaScript app. React and Glisse are being
+introduced incrementally in `nico-react/`; the welcome prompt buttons are the
+first React island, with static buttons retained as a fallback.
+
+For local development, install and build the island once:
+
+```text
+npm --prefix nico-react ci
+npm --prefix nico-react run build
+```
+
+On Windows, `.\developer_nico_test.ps1` builds the React island, starts the
+local FastAPI backend and static frontend, checks both services, and opens the
+app in a browser. It enables demo auth only for the launched backend process
+and does not edit `.env`.
+
+Render builds the bundle as part of the static-site build. For Capacitor,
+`npm run sync:web` in `nico-mobile/` builds the island and copies it with the
+rest of the web app.

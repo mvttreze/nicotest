@@ -30,7 +30,7 @@ const FILES = [
   "icon-maskable-512.png",
   "icon-dark-512.png",
 ];
-const DIRS = ["icons"];
+const DIRS = ["icons", path.join("nico-react", "dist")];
 
 fs.mkdirSync(WWW, { recursive: true });
 

@@ -7,5 +7,7 @@ __pycache__/
 githubchat.txt
 chat.txt
 patches.json
+nico-react/node_modules/
+nico-react/dist/
 nico-desktop/node_modules/
 nico-desktop/dist/

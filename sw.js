@@ -1,9 +1,11 @@
-const CACHE_NAME = "nico-shell-v14";
+const CACHE_NAME = "nico-shell-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./nico-redesign.css",
+  "./nico-react/dist/nico-react-ui.css",
+  "./nico-react/dist/nico-react-ui.js",
   "./nico-ui.js",
   "./script.js",
   "./artifacts.js",
