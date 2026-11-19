@@ -3372,3 +3372,140 @@ body textarea:focus-visible {
   .patch-actions { justify-content: stretch; }
   .patch-actions button { flex: 1 1 auto; }
 }
+
+/* Glisse-inspired liquid glass material, adapted for Nico's vanilla UI. */
+:root {
+  --nico-glass-surface: rgba(38, 38, 42, 0.70);
+  --nico-glass-control: rgba(255, 255, 255, 0.045);
+  --nico-glass-control-hover: rgba(255, 255, 255, 0.09);
+  --nico-glass-rim: rgba(255, 255, 255, 0.16);
+  --nico-glass-blur: 14px;
+  --nico-glass-saturation: 1.16;
+  --nico-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.025), var(--shadow-soft);
+}
+body {
+  --surface: var(--nico-glass-surface);
+  --line: var(--nico-glass-rim);
+}
+body.theme-light {
+  --nico-glass-surface: rgba(255, 255, 255, 0.72);
+  --nico-glass-control: rgba(24, 24, 27, 0.035);
+  --nico-glass-control-hover: rgba(24, 24, 27, 0.075);
+  --nico-glass-rim: rgba(24, 24, 27, 0.14);
+  --nico-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(24, 24, 27, 0.025), var(--shadow-soft);
+  --line: var(--nico-glass-rim);
+}
+body .sidebar,
+body .input-pill,
+body .settings-panel,
+body .admin-dashboard-panel,
+body .artifact-panel,
+body .gallery-panel,
+body .palette-box,
+body .credits-card,
+body .add-files-dropdown,
+body .export-dropdown,
+body .reminder-dropdown,
+body .auth-card,
+body .guest-prompt {
+  background-color: var(--nico-glass-surface) !important;
+  background-image: none !important;
+  border-color: var(--nico-glass-rim) !important;
+  box-shadow: var(--nico-glass-shadow);
+  -webkit-backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation));
+  backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation));
+  transition: background-color 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+body .icon-btn,
+body .top-header-actions button,
+body .settings-tabs .settings-tab,
+body .welcome-suggestions button,
+body .patch-actions button,
+body .patch-capture button {
+  background-color: var(--nico-glass-control);
+  border-color: var(--nico-glass-rim);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  -webkit-backdrop-filter: blur(10px) saturate(var(--nico-glass-saturation));
+  backdrop-filter: blur(10px) saturate(var(--nico-glass-saturation));
+}
+body .icon-btn:hover:not(:disabled),
+body .top-header-actions button:hover:not(:disabled),
+body .settings-tabs .settings-tab:hover:not(:disabled),
+body .welcome-suggestions button:hover:not(:disabled),
+body .patch-actions button:hover:not(:disabled),
+body .patch-capture button:hover:not(:disabled) {
+  background-color: var(--nico-glass-control-hover);
+  border-color: var(--nico-glass-rim);
+}
+body .new-chat-btn,
+body .send-btn,
+body .auth-primary-btn {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (max-width: 768px) {
+  :root { --nico-glass-blur: 8px; }
+  body .icon-btn,
+  body .top-header-actions button,
+  body .settings-tabs .settings-tab,
+  body .welcome-suggestions button,
+  body .patch-actions button,
+  body .patch-capture button {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root { --nico-glass-blur: 0px; }
+  body .sidebar,
+  body .input-pill,
+  body .settings-panel,
+  body .admin-dashboard-panel,
+  body .artifact-panel,
+  body .gallery-panel,
+  body .palette-box,
+  body .credits-card,
+  body .add-files-dropdown,
+  body .export-dropdown,
+  body .reminder-dropdown,
+  body .auth-card,
+  body .guest-prompt {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: var(--bg-accent) !important;
+  }
+}
+@supports not ((backdrop-filter: blur(1px))) {
+  body .sidebar,
+  body .input-pill,
+  body .settings-panel,
+  body .admin-dashboard-panel,
+  body .artifact-panel,
+  body .gallery-panel,
+  body .palette-box,
+  body .credits-card,
+  body .add-files-dropdown,
+  body .export-dropdown,
+  body .reminder-dropdown,
+  body .auth-card,
+  body .guest-prompt {
+    background-color: #202023 !important;
+  }
+  body.theme-light .sidebar,
+  body.theme-light .input-pill,
+  body.theme-light .settings-panel,
+  body.theme-light .admin-dashboard-panel,
+  body.theme-light .artifact-panel,
+  body.theme-light .gallery-panel,
+  body.theme-light .palette-box,
+  body.theme-light .credits-card,
+  body.theme-light .add-files-dropdown,
+  body.theme-light .export-dropdown,
+  body.theme-light .reminder-dropdown,
+  body.theme-light .auth-card,
+  body.theme-light .guest-prompt {
+    background-color: #fff !important;
+  }
+}
