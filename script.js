@@ -240,7 +240,7 @@ function applySettings() {
           ? "Brainrot • Dry nerd mode"
           : settings.personality === "developer"
             ? "Developer • Matt Andrei"
-            : "Nico v2 • System OS";
+            : "Nico • System OS";
   const typingIndicator = document.getElementById("typingIndicator");
   if (typingIndicator) typingIndicator.innerText = getAssistantThinkingLabel();
   const customBackgroundStatus = document.getElementById(
