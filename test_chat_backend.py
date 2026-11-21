@@ -92,6 +92,57 @@ def test_title_generation_is_local_and_bounded():
     assert len(title) <= 60
 
 
+def test_generated_image_fallback_keeps_the_actual_format(monkeypatch):
+    png = b"\x89PNG\r\n\x1a\n" + b"test-png-data"
+
+    async def fake_render(_prompt, use_gateway=False):
+        return png, "test-provider"
+
+    def fail_downscale(_raw):
+        raise RuntimeError("Pillow unavailable")
+
+    monkeypatch.setattr(main, "render_image", fake_render)
+    monkeypatch.setattr(main, "downscale_image_bytes", fail_downscale)
+
+    async def run():
+        return await main.imagine(
+            main.ImagineRequest(prompt="A small red house"), authorization=None
+        )
+
+    result = asyncio.run(run())
+    assert result["image_url"].startswith("data:image/png;base64,")
+
+
+def test_generated_image_rejects_unrecognized_provider_data():
+    try:
+        main.generated_image_data_url(b"not an image")
+    except HTTPException as error:
+        assert error.status_code == 502
+    else:
+        raise AssertionError("invalid provider bytes should not be labeled as an image")
+
+
+def test_generated_pair_uses_uniform_message_columns(monkeypatch):
+    conversation_id, database = configure_signed_in_chat(monkeypatch)
+    database.messages.clear()
+    user = SimpleNamespace(id="signed-in-user", email="user@example.com")
+    attachments = [{
+        "name": "nico-image.jpg",
+        "mime_type": "image/jpeg",
+        "data_url": "data:image/jpeg;base64,AA==",
+    }]
+
+    main._save_generated_pair(
+        user, conversation_id, "Draw a lighthouse", "Generated image", attachments,
+        "Nico image: lighthouse",
+    )
+
+    user_message, assistant_message = database.messages
+    assert set(user_message) == set(assistant_message)
+    assert user_message["attachments"] == []
+    assert assistant_message["attachments"] == attachments
+
+
 def test_signed_in_chat_sends_current_message_once(monkeypatch):
     conversation_id, database = configure_signed_in_chat(monkeypatch)
     captured = {}

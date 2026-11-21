@@ -1930,6 +1930,36 @@ def downscale_image_bytes(raw: bytes, max_dim=1024, quality=82):
   return buf.getvalue()
 
 
+def generated_image_data_url(raw: bytes):
+  if not isinstance(raw, (bytes, bytearray)) or not raw:
+    raise HTTPException(status_code=502, detail="Image provider returned empty data")
+  image_bytes = bytes(raw)
+  try:
+    image_bytes = downscale_image_bytes(image_bytes)
+    mime_type = "image/jpeg"
+  except Exception:
+    signatures = (
+      (b"\x89PNG\r\n\x1a\n", "image/png"),
+      (b"\xff\xd8\xff", "image/jpeg"),
+      (b"GIF87a", "image/gif"),
+      (b"GIF89a", "image/gif"),
+      (b"BM", "image/bmp"),
+    )
+    mime_type = next(
+      (mime for signature, mime in signatures if image_bytes.startswith(signature)),
+      None,
+    )
+    if mime_type is None and image_bytes.startswith(b"RIFF") and image_bytes[8:12] == b"WEBP":
+      mime_type = "image/webp"
+    if mime_type is None:
+      raise HTTPException(
+        status_code=502,
+        detail="Image provider returned data Nico could not decode",
+      )
+  encoded = base64.b64encode(image_bytes).decode("ascii")
+  return f"data:{mime_type};base64,{encoded}", mime_type
+
+
 async def render_image_gemini(prompt: str):
   if not gemini_client:
     raise RuntimeError("Gemini is not configured")
@@ -2179,19 +2209,14 @@ async def imagine(
   # Gateway images are tester-gated: any badge (tester/supporter/admin).
   gateway_badges = get_user_badges(img_user) if img_user else set()
   raw, provider = await render_image(prompt, use_gateway=bool(gateway_badges))
-  try:
-    data_url = "data:image/jpeg;base64," + base64.b64encode(
-      downscale_image_bytes(raw)
-    ).decode("ascii")
-  except Exception:
-    data_url = "data:image/jpeg;base64," + base64.b64encode(raw).decode("ascii")
+  data_url, mime_type = generated_image_data_url(raw)
   result = {"image_url": data_url, "prompt": prompt[:500], "provider": provider}
   user = img_user
   if user and request.conversation_id:
     caption = f"**{result['prompt']}**"
     attachments = [{
-      "name": "nico-image.jpg",
-      "mime_type": "image/jpeg",
+      "name": "nico-image." + mime_type.split("/", 1)[1].replace("jpeg", "jpg"),
+      "mime_type": mime_type,
       "data_url": data_url,
     }]
     _save_generated_pair(
