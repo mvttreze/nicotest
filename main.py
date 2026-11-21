@@ -490,12 +490,6 @@ def admin_logs(authorization: str | None = Header(default=None)):
   return {"logs": ADMIN_LOGS[-50:]}
 
 
-@app.get("/admin/logs")
-def admin_logs(authorization: str | None = Header(default=None)):
-  require_admin(authorization)
-  return {"logs": ADMIN_LOGS[-50:]}
-
-
 @app.delete("/admin/logs")
 def clear_admin_logs(authorization: str | None = Header(default=None)):
   require_admin(authorization)
@@ -1061,6 +1055,38 @@ class ChatRequest(BaseModel):
     return self
 
 
+def normalize_chat_settings(settings: dict, badges: set[str], is_admin_user: bool):
+  requested_personality = settings.get("personality", "professional")
+  if not isinstance(requested_personality, str):
+    requested_personality = ""
+  requested_personality = requested_personality.strip().lower()
+  personality = requested_personality if requested_personality in {
+    "professional", "casual", "hype",
+  } else "professional"
+  if requested_personality == "mica" and badges:
+    personality = "mica"
+  elif requested_personality == "brainrot" and badges:
+    personality = "brainrot"
+  elif requested_personality == "developer" and is_admin_user:
+    personality = "developer"
+
+  requested_length = settings.get("length", "short")
+  response_length = (
+    requested_length
+    if isinstance(requested_length, str) and requested_length in {"short", "detailed"}
+    else "short"
+  )
+  requested_model = settings.get("model", "light")
+  model_mode = (
+    requested_model
+    if isinstance(requested_model, str) and requested_model in {"light", "heavy"}
+    else "light"
+  )
+  memory_value = settings.get("memoryText", "") if settings.get("memory", True) else ""
+  memory = memory_value[:2000] if isinstance(memory_value, str) else ""
+  return personality, response_length, memory, model_mode
+
+
 def get_current_user(authorization: str | None):
   if authorization and authorization.startswith("Bearer demo-"):
     return get_demo_user_from_token(authorization.removeprefix("Bearer ").strip())
@@ -1382,43 +1408,18 @@ async def render_image_gateway(prompt: str):
 
 
 async def generate_title(text: str, use_zen: bool = False, use_gateway: bool = False):
-  prompt = (
-    "Summarize this query into a 3 to 5 word title. Do not use quotes or"
-    f" punctuation: '{text}'"
-  )
-
-  async def via_zen():
-    return (
-      await zen_chat_once(
-        OPENCODE_MODELS[0], [{"role": "user", "content": prompt}]
-      )
-    ).strip() or "Untitled Chat"
-
-  async def via_groq():
-    title_res = await groq_client.chat.completions.create(
-      messages=[{"role": "user", "content": prompt}],
-      model="openai/gpt-oss-120b",
-    )
-    return (title_res.choices[0].message.content or "").strip() or "Untitled Chat"
-
-  async def via_freellmapi():
-    return (
-      await freellmapi_chat_once([{"role": "user", "content": prompt}])
-    ).strip() or "Untitled Chat"
-
-  attempts = []
-  if use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
-    attempts.append(via_zen)
-  if groq_client:
-    attempts.append(via_groq)
-  if use_gateway and freellmapi_enabled():
-    attempts.append(via_freellmapi)
-  for attempt in attempts:
-    try:
-      return await attempt()
-    except Exception:
-      continue
-  return "Untitled Chat"
+  # Keep conversation creation off the model-provider critical path. A title
+  # request here delayed the first chat response and could make a healthy chat
+  # appear stuck while provider fallbacks timed out. Use a useful local title;
+  # retain the old optional arguments for callers during rollout.
+  del use_zen, use_gateway
+  normalized = " ".join(str(text or "").split()).strip(" \t\r\n\"'`.,!?;:")
+  if not normalized:
+    return "Untitled Chat"
+  title = " ".join(normalized.split()[:5])
+  if len(title) > 60:
+    title = title[:57].rsplit(" ", 1)[0].rstrip(" \t\r\n\"'`.,!?;:")
+  return title or "Untitled Chat"
 
 
 async def generate_gemini_image_response(message, attachments, system_prompt):
@@ -2140,8 +2141,6 @@ class GenerateDocRequest(BaseModel):
   kind: str = "pdf"
   conversation_id: str | None = None
   display: str | None = None
-  conversation_id: str | None = None
-  display: str | None = None
 
 
 @app.post("/export/docx")
@@ -2176,10 +2175,7 @@ async def imagine(
   prompt = (request.prompt or "").strip()
   if len(prompt) < 3:
     raise HTTPException(status_code=400, detail="Describe the image first")
-  try:
-    img_user = get_current_user(authorization) if authorization else None
-  except HTTPException:
-    img_user = None
+  img_user = get_current_user(authorization) if authorization else None
   # Gateway images are tester-gated: any badge (tester/supporter/admin).
   gateway_badges = get_user_badges(img_user) if img_user else set()
   raw, provider = await render_image(prompt, use_gateway=bool(gateway_badges))
@@ -2211,6 +2207,7 @@ async def export_generate(
     request: GenerateDocRequest,
     authorization: str | None = Header(default=None),
 ):
+  user = get_current_user(authorization) if authorization else None
   topic = (request.topic or "").strip()
   if len(topic) < 3:
     raise HTTPException(status_code=400, detail="Give a topic first")
@@ -2223,10 +2220,6 @@ async def export_generate(
   else:
     data = build_pdf(title, markdown_text)
     mime_type = "application/pdf"
-  try:
-    user = get_current_user(authorization) if authorization else None
-  except HTTPException:
-    user = None
   if user and request.conversation_id:
     filename = slug_filename(title, kind)
     attachments = [{
@@ -2466,10 +2459,6 @@ def get_user_badges(user):
       pass
   if is_developer_identity(user):
     badges.add("admin")
-  elif ((getattr(user, "user_metadata", {}) or {}).get("role") or "").lower() == "developer":
-    # Mirror the frontend Developer check so role-based admin accounts
-    # get the same treatment (e.g. Nemotron-first routing).
-    badges.add("admin")
   return badges
 
 
@@ -2646,8 +2635,6 @@ async def chat_stream(
     request: ChatRequest,
     authorization: str | None = Header(default=None),
 ):
-  if not groq_client and not (OPENCODE_API_KEY and OPENCODE_MODELS):
-    raise HTTPException(status_code=503, detail="No chat provider is configured")
   user = get_current_user(authorization) if authorization else None
   is_guest = user is None
   is_admin_user = is_developer_identity(user) if user else False
@@ -2656,6 +2643,17 @@ async def chat_stream(
   user_badge_set = get_user_badges(user) if user else set()
   can_use_zen = bool(user) and bool(user_badge_set - {"tester"})
   can_use_gateway = bool(user) and bool(user_badge_set)
+  image_request = any(
+    attachment.get("mime_type", "").startswith("image/")
+    for attachment in request.attachments
+  )
+  has_chat_provider = bool(
+    groq_client
+    or (can_use_zen and OPENCODE_API_KEY and OPENCODE_MODELS)
+    or (can_use_gateway and freellmapi_enabled())
+  )
+  if not has_chat_provider and not (image_request and gemini_client):
+    raise HTTPException(status_code=503, detail="No chat provider is available for this account")
 
   if MAINTENANCE["enabled"] and not is_admin_user:
     async def _maintenance_reply():
@@ -2707,6 +2705,8 @@ async def chat_stream(
           "user_id": user.id,
         }).execute()
 
+      # Read only earlier turns before persisting the current user message.
+      # The current turn is appended to the provider payload below exactly once.
       history_response = fetch_messages(request.conversation_id)
       past_messages = (
           history_response
@@ -2753,9 +2753,9 @@ async def chat_stream(
       f"{CREATOR_NAME}. If asked who the admin or coder is, identify Matt Andrei. "
       "Do not invent additional personal details."
   )
-  personality = request.settings.get("personality", "professional")
-  response_length = request.settings.get("length", "short")
-  memory = request.settings.get("memoryText", "") if request.settings.get("memory", True) else ""
+  personality, response_length, memory, model_mode = normalize_chat_settings(
+    request.settings, user_badge_set, is_admin_user
+  )
   memory = sanitize_nico_role_memory(memory, is_admin_user)
   developer_identity_override = ""
   if is_admin_user:
@@ -2865,10 +2865,6 @@ async def chat_stream(
       full_reply = build_identity_reply()
       yield full_reply
     else:
-      image_request = any(
-        attachment.get("mime_type", "").startswith("image/")
-        for attachment in request.attachments
-      )
       if image_request:
         try:
           full_reply = await generate_gemini_image_response(
@@ -2888,7 +2884,7 @@ async def chat_stream(
           models_to_try.append((
             "groq",
             "openai/gpt-oss-20b"
-            if request.settings.get("model") == "light"
+            if model_mode == "light"
             else "openai/gpt-oss-120b",
           ))
         if can_use_gateway and freellmapi_enabled():
@@ -2928,6 +2924,12 @@ async def chat_stream(
           raise
         except Exception as error:
           last_error = error
+          if full_reply:
+            notice = "\n\nNico's response was interrupted. Ask Nico to continue if you need the rest."
+            notice = format_response(notice)
+            full_reply += notice
+            yield notice
+            break
           continue
 
       if not full_reply and last_error:
@@ -2946,6 +2948,10 @@ async def chat_stream(
         yield full_reply
       elif not full_reply and not models_to_try:
         full_reply = "Nico has no chat provider available right now. Try again in a bit."
+        full_reply = format_response(full_reply)
+        yield full_reply
+      elif not full_reply:
+        full_reply = "The AI provider returned an empty response. Please try again."
         full_reply = format_response(full_reply)
         yield full_reply
 
