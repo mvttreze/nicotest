@@ -1,7 +1,5 @@
 import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { Button } from "glisse";
-import "glisse/styles.css";
 import "./styles.css";
 
 const suggestions = [
@@ -101,15 +99,15 @@ function WelcomeSuggestions() {
   }
 
   return suggestions.map((suggestion) => (
-    <Button
+    <button
       key={suggestion.label}
       type="button"
       className="nico-react-suggestion"
-      icon={<SuggestionIcon name={suggestion.icon} />}
       onClick={() => selectPrompt(suggestion.prompt)}
     >
+      <SuggestionIcon name={suggestion.icon} />
       {suggestion.label}
-    </Button>
+    </button>
   ));
 }
 

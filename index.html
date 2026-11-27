@@ -23,8 +23,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NICO AI</title>
     <link rel="stylesheet" href="style.css?v=fix27">
-    <link rel="stylesheet" href="nico-redesign.css?v=mobile-sidebar-v1">
-    <link rel="stylesheet" href="nico-react/dist/nico-react-ui.css?v=react-ui-1">
+    <link rel="stylesheet" href="nico-redesign.css?v=liquid-glass-3">
+    <link rel="stylesheet" href="nico-react/dist/nico-react-ui.css?v=liquid-glass-1">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f1117">
     <link rel="icon" id="nicoFavicon" href="icon.svg" type="image/svg+xml">
@@ -34,6 +34,10 @@
     <meta name="supabase-anon-key" content="sb_publishable_4dbScBcCdNfUBwPKQSm5QQ_xUK--1vK">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.19.1/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.12.0/highlight.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -42,7 +46,7 @@
 <div class="auth-screen is-visible" id="authScreen" aria-live="polite">
     <div class="auth-card">
         <div class="auth-logo" aria-label="Nico logo"><svg viewBox="0 0 512 512" role="img" aria-label="Nico"><rect x="42" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><rect x="455" y="172" width="15" height="78" rx="7.5" style="fill:var(--accent)"/><path d="M30 238 C12 268 12 330 66 364 L84 334 C58 314 56 272 64 246 Z" style="fill:var(--accent)"/><path d="M482 238 C500 268 500 330 446 364 L428 334 C454 314 456 272 448 246 Z" style="fill:var(--accent)"/><path d="M256 108 C158 108 80 178 80 272 C80 340 128 394 196 416 L172 452 C170 456 174 461 179 459 L228 440 C237 442 247 443 256 443 C354 443 432 373 432 279 C432 185 354 108 256 108 Z" style="fill:var(--accent)"/><rect x="128" y="168" width="256" height="196" rx="86" fill="#FFFFFF"/><path d="M168 258 C168 236 188 222 210 222 C232 222 252 236 252 258 C252 266 246 271 238 271 L184 271 C176 271 168 266 168 258 Z" style="fill:var(--accent)"/><path d="M260 258 C260 236 280 222 302 222 C324 222 344 236 344 258 C344 266 338 271 330 271 L276 271 C268 271 260 266 260 258 Z" style="fill:var(--accent)"/><path d="M238 296 Q256 312 274 296" fill="none" style="stroke:var(--accent)" stroke-width="11" stroke-linecap="round"/></svg></div>
-        <h1>Sign in to Nico</h1>
+        <h1 id="authTitle">Sign in to Nico</h1>
 
         <form id="authForm" class="auth-form" novalidate>
             <label class="auth-field">
@@ -68,8 +72,10 @@
                 </button>
             </div>
 
-            <button id="authSubmitBtn" class="auth-primary-btn" type="submit"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg>Sign in</button>
+            <button id="authSubmitBtn" class="auth-primary-btn" type="submit"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5"/></svg><span id="authSubmitLabel">Sign in</span></button>
         </form>
+
+        <p class="auth-feedback" id="authFeedback" role="status" aria-live="polite" hidden></p>
 
         <div class="auth-divider"><span>or</span></div>
 
@@ -87,14 +93,15 @@
 
         <button class="auth-btn guest-btn" id="continueAsGuestBtn" type="button">
             <svg class="guest-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M8 4a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>
-                <path d="M3 10h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2z"/>
+                <circle cx="8" cy="5" r="2.4"/>
+                <path d="M2.7 13.8c.5-2.6 2.3-4.1 5.3-4.1s4.8 1.5 5.3 4.1"/>
             </svg>
             Continue as guest
         </button>
 
         <div class="auth-footer">
-            <span>New to Nico? <a id="createAccountLink" href="#">Create an account</a></span>
+            <span id="authFooterPrompt">New to Nico?</span>
+            <a id="createAccountLink" href="#">Create an account</a>
         </div>
 
         <div class="auth-footer auth-footer-small">
@@ -514,15 +521,15 @@
     </aside>
 </div>
 
-<script src="script.js?v=fix31"></script>
+<script src="script.js?v=markdown-render-3"></script>
 <script src="panel-dismiss.js?v=fix33"></script>
 <script src="artifacts.js?v=fix32"></script>
-<script src="icons.js?v=fix31"></script>
+<script src="icons.js?v=fix32"></script>
 <script src="gallery.js?v=fix32"></script>
-<script src="settings-ui.js?v=fix31"></script>
+<script src="settings-ui.js?v=fix32"></script>
 <script src="greetings.js?v=fix31"></script>
 <script src="nico-ui.js?v=fix27"></script>
-<script defer src="nico-react/dist/nico-react-ui.js?v=react-ui-1"></script>
+<script defer src="nico-react/dist/nico-react-ui.js?v=liquid-glass-1"></script>
 <script>
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js");

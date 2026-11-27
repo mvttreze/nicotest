@@ -6,7 +6,6 @@
     "build": "esbuild src/main.jsx --bundle --minify --format=iife --jsx=automatic --outdir=dist --entry-names=nico-react-ui"
   },
   "dependencies": {
-    "glisse": "^0.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

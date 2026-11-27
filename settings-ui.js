@@ -172,6 +172,24 @@
       moveIndicator(active);
     }
 
+    // Translate a regular mouse wheel into horizontal movement when the tab
+    // strip overflows. Keep edge scrolling available to the settings panel.
+    list.addEventListener("wheel", function (event) {
+      if (event.ctrlKey || list.scrollWidth <= list.clientWidth + 1) return;
+
+      var delta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+      if (!delta) return;
+
+      var maxScroll = list.scrollWidth - list.clientWidth;
+      var nextScroll = Math.max(0, Math.min(maxScroll, list.scrollLeft + delta));
+      if (nextScroll === list.scrollLeft) return;
+
+      event.preventDefault();
+      list.scrollLeft = nextScroll;
+    }, { passive: false });
+
     Array.prototype.forEach.call(tabs, function (tab) {
       tab.addEventListener("click", function () {
         Array.prototype.forEach.call(tabs, function (other) {

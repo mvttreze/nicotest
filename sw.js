@@ -1,4 +1,4 @@
-const CACHE_NAME = "nico-shell-v22";
+const CACHE_NAME = "nico-shell-v30";
 const APP_SHELL = [
   "./",
   "./index.html",

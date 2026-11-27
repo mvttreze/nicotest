@@ -69,6 +69,25 @@ body .auth-primary-btn{background:var(--grad);color:#fff;border-radius:var(--r-m
 @media (max-width:768px){body .app-layout{padding:0;gap:0}body .sidebar{border-radius:0}.mode-chips{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start}body .welcome-title{font-size:2.4rem}}
 @media (prefers-reduced-motion:reduce){body .welcome-container::before{animation:none}}
 
+/* Markdown rendering details: preserve the current chat layout while making
+   long-form, code, table, checklist, and math content readable on small screens. */
+body .message .content h4{font-family:var(--ui);font-size:.96rem;font-weight:600;letter-spacing:-.005em;margin:1rem 0 .35rem;color:var(--text-primary)}
+body .message .content h4:first-child{margin-top:0}
+body .message .content a{overflow-wrap:anywhere;word-break:break-word}
+body .message .content th[align="left"],body .message .content td[align="left"]{text-align:left}
+body .message .content th[align="center"],body .message .content td[align="center"]{text-align:center}
+body .message .content th[align="right"],body .message .content td[align="right"]{text-align:right}
+body .message .content ul.contains-task-list{list-style:none;padding-left:.2rem}
+body .message .content li.task-list-item{list-style:none}
+body .message .content li.task-list-item input[type="checkbox"]{accent-color:var(--accent);vertical-align:middle;margin:0 .5rem .15rem 0;pointer-events:none}
+body .message .content .katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.3rem 0 .45rem}
+body .message .content .katex{font-size:1.05em}
+body .message .content .hljs{color:var(--text-primary);background:transparent}
+body .message .content .hljs-comment,body .message .content .hljs-quote{color:var(--text-muted);font-style:italic}
+body .message .content .hljs-keyword,body .message .content .hljs-selector-tag,body .message .content .hljs-literal,body .message .content .hljs-doctag,body .message .content .hljs-meta .hljs-keyword{color:var(--accent)}
+body .message .content .hljs-string,body .message .content .hljs-regexp,body .message .content .hljs-attr,body .message .content .hljs-attribute{color:var(--text-secondary)}
+body .message .content .hljs-number,body .message .content .hljs-built_in,body .message .content .hljs-type,body .message .content .hljs-title{font-weight:600}
+
 /* old rules forced the chat area to near-full height and pushed the composer off-screen */
 body .app-layout .chat-container{min-height:0!important}
 body .welcome-title span{background:none!important;-webkit-text-fill-color:currentColor;font:inherit;letter-spacing:inherit;color:inherit}
@@ -932,6 +951,22 @@ body .auth-card input {
 }
 body .auth-card input:focus { border-color: var(--accent); box-shadow: none; }
 body .auth-primary-btn { background: var(--accent); color: #fff; border-radius: var(--r-sm); }
+body .auth-card #authSubmitBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 16px;
+  line-height: 1;
+}
+body .auth-card #authSubmitBtn svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
 body .auth-card button:not(.auth-primary-btn) {
   background: transparent;
   border: 1px solid var(--line);
@@ -939,6 +974,36 @@ body .auth-card button:not(.auth-primary-btn) {
   border-radius: var(--r-sm);
 }
 body .auth-card button:not(.auth-primary-btn):hover { background: var(--panel); }
+body .auth-card .auth-password-toggle:hover:not(:disabled),
+body .auth-card .auth-password-toggle:active:not(:disabled) {
+  transform: translateY(-50%);
+}
+body .auth-card .auth-footer:not(.auth-footer-small) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0.25rem 0.35rem;
+  line-height: 1.4;
+}
+body .auth-card .auth-footer:not(.auth-footer-small) a {
+  color: var(--accent);
+  font-weight: 650;
+  text-decoration: none;
+}
+body .auth-card .auth-footer:not(.auth-footer-small) a:hover,
+body .auth-card .auth-footer:not(.auth-footer-small) a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+body .auth-feedback {
+  margin: 8px 0 0;
+  color: var(--accent-2);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: center;
+}
+body .auth-feedback[hidden] { display: none; }
 body .auth-card a,
 body .auth-card .auth-link { color: var(--accent); }
 
@@ -1547,7 +1612,7 @@ body .export-btn .ico { margin-right: 5px; }
 /* ---------- Sidebar quick access (above Recents) ---------- */
 .sidebar-quick {
   display: grid;
-  gap: 1px;
+  gap: 7px;
   padding: 2px 0 6px;
   margin-bottom: 2px;
   border-bottom: 1px solid var(--line);
@@ -1961,6 +2026,9 @@ body .settings-tabs {
   gap: 2px;
   padding: 8px 14px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid var(--line);
   flex: 0 0 auto;
   scrollbar-width: none;
@@ -3415,340 +3483,9 @@ body textarea:focus-visible {
   .patch-actions button { flex: 1 1 auto; }
 }
 
-/* Glisse-inspired liquid glass material, adapted for Nico's vanilla UI. */
-:root {
-  --nico-glass-surface: rgba(20, 24, 38, 0.48);
-  --nico-glass-tint: #6ea8ff;
-  --nico-glass-control: rgba(255, 255, 255, 0.075);
-  --nico-glass-control-hover: rgba(255, 255, 255, 0.14);
-  --nico-glass-rim: rgba(255, 255, 255, 0.24);
-  --nico-glass-blur: 26px;
-  --nico-glass-saturation: 1.65;
-  --nico-glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.045),
-    0 24px 70px rgba(0, 0, 0, 0.28),
-    0 0 38px color-mix(in srgb, var(--nico-glass-tint) 14%, transparent);
-  --nico-glass-sheen: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.16),
-    rgba(255, 255, 255, 0.035) 36%,
-    transparent 64%,
-    color-mix(in srgb, var(--nico-glass-tint) 12%, transparent)
-  );
-}
-body {
-  --surface: var(--nico-glass-surface);
-  --line: var(--nico-glass-rim);
-}
-body.theme-cyberpunk { --nico-glass-tint: #67f7d1; }
-body.theme-sunset { --nico-glass-tint: #ff9f68; }
-body.theme-aurora { --nico-glass-tint: #72f1c5; }
-body.theme-ocean { --nico-glass-tint: #62b8ff; }
-body.theme-forest { --nico-glass-tint: #a7e46f; }
-body.theme-graphite { --nico-glass-tint: #d7dbe3; }
-body.theme-cotton-candy { --nico-glass-tint: #ff9fd7; }
-body.theme-brainrot { --nico-glass-tint: #b6f36b; }
-body:not(.custom-background) {
-  background:
-    radial-gradient(54rem 38rem at 7% 4%, color-mix(in srgb, var(--nico-glass-tint) 27%, transparent), transparent 68%),
-    radial-gradient(48rem 34rem at 96% 18%, color-mix(in srgb, var(--nico-glass-tint) 21%, transparent), transparent 70%),
-    radial-gradient(50rem 34rem at 52% 110%, color-mix(in srgb, var(--nico-glass-tint) 15%, transparent), transparent 72%),
-    var(--bg-main) !important;
-}
-body .app-layout {
-  background: transparent !important;
-}
-body.theme-light {
-  --nico-glass-surface: rgba(247, 250, 255, 0.68);
-  --nico-glass-tint: #94acd1;
-  --nico-glass-control: rgba(255, 255, 255, 0.42);
-  --nico-glass-control-hover: rgba(255, 255, 255, 0.72);
-  --nico-glass-rim: rgba(44, 58, 78, 0.18);
-  --nico-glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.94),
-    inset 0 -1px 0 rgba(24, 36, 54, 0.045),
-    0 24px 70px rgba(37, 52, 74, 0.16),
-    0 0 38px color-mix(in srgb, var(--nico-glass-tint) 14%, transparent);
-  --nico-glass-sheen: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.84),
-    rgba(255, 255, 255, 0.28) 36%,
-    transparent 64%,
-    color-mix(in srgb, var(--nico-glass-tint) 10%, transparent)
-  );
-  --line: var(--nico-glass-rim);
-}
-
-body .sidebar,
-body .input-pill,
-body .settings-panel,
-body .admin-dashboard-panel,
-body .artifact-panel,
-body .gallery-panel,
-body .palette-box,
-body .credits-card,
-body .add-files-dropdown,
-body .export-dropdown,
-body .reminder-dropdown,
-body .auth-card,
-body .guest-prompt,
-body .vision-frame,
-body .conversation-menu {
-  background-color: var(--nico-glass-surface) !important;
-  background-image: var(--nico-glass-sheen) !important;
-  border-color: var(--nico-glass-rim) !important;
-  box-shadow: var(--nico-glass-shadow);
-  -webkit-backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation)) contrast(1.04) !important;
-  backdrop-filter: blur(var(--nico-glass-blur)) saturate(var(--nico-glass-saturation)) contrast(1.04) !important;
-  transition: background-color 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
-}
-
-body .auth-screen {
-  color: var(--text-primary);
-  background:
-    radial-gradient(40rem 28rem at 50% 30%, var(--accent-glow), transparent 70%),
-    rgba(5, 3, 12, 0.24) !important;
-  -webkit-backdrop-filter: blur(8px) saturate(1.2);
-  backdrop-filter: blur(8px) saturate(1.2);
-}
-body.theme-light .auth-screen {
-  background:
-    radial-gradient(40rem 28rem at 50% 30%, var(--accent-glow), transparent 70%),
-    rgba(233, 239, 248, 0.22) !important;
-}
-body .auth-card h1,
-body .auth-card .auth-field span,
-body .auth-card .auth-row label {
-  color: var(--text-primary);
-}
-
-body .icon-btn,
-body .top-header-actions button,
-body button.mobile-menu-btn,
-body .settings-btn,
-body .quick-link,
-body .settings-tabs .settings-tab:not(.is-active):not([aria-selected="true"]),
-body .welcome-suggestions button,
-body .dropdown-item,
-body .settings-action-btn,
-body .vision-control:not(.primary),
-body .admin-close-btn,
-body .credits-x,
-body .palette-hint,
-body .patch-actions button,
-body .patch-capture button,
-body .conversation-menu-item {
-  background-color: var(--nico-glass-control);
-  background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.015) 72%, color-mix(in srgb, var(--nico-glass-tint) 8%, transparent));
-  border-color: var(--nico-glass-rim);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13);
-  -webkit-backdrop-filter: blur(12px) saturate(var(--nico-glass-saturation));
-  backdrop-filter: blur(12px) saturate(var(--nico-glass-saturation));
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-body .icon-btn:hover:not(:disabled),
-body .top-header-actions button:hover:not(:disabled),
-body button.mobile-menu-btn:hover:not(:disabled),
-body .settings-btn:hover:not(:disabled),
-body .quick-link:hover:not(:disabled),
-body .settings-tabs .settings-tab:hover:not(:disabled):not(.is-active):not([aria-selected="true"]),
-body .welcome-suggestions button:hover:not(:disabled),
-body .dropdown-item:hover:not(:disabled),
-body .settings-action-btn:hover:not(:disabled),
-body .vision-control:not(.primary):hover:not(:disabled),
-body .admin-close-btn:hover:not(:disabled),
-body .credits-x:hover:not(:disabled),
-body .palette-hint:hover:not(:disabled),
-body .patch-actions button:hover:not(:disabled),
-body .patch-capture button:hover:not(:disabled),
-body .conversation-menu-item:hover:not(:disabled) {
-  background-color: var(--nico-glass-control-hover);
-  border-color: color-mix(in srgb, var(--nico-glass-tint) 38%, var(--nico-glass-rim));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 22px color-mix(in srgb, var(--nico-glass-tint) 16%, transparent);
-}
-body .settings-tabs .settings-tab.is-active,
-body .settings-tabs .settings-tab[aria-selected="true"],
-body .palette-item.is-active {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 5px 18px color-mix(in srgb, var(--nico-glass-tint) 24%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  backdrop-filter: blur(12px) saturate(1.4);
-}
-
-body .auth-card input,
-body .settings-panel select,
-body .settings-panel input[type="text"],
-body .settings-panel textarea,
-body .palette-input {
-  background-color: var(--nico-glass-control);
-  border-color: var(--nico-glass-rim);
-  -webkit-backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
-  backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
-}
-body .new-chat-btn,
-body .send-btn,
-body .auth-primary-btn,
-body .vision-control.primary {
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.08),
-    0 10px 28px color-mix(in srgb, var(--accent) 24%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  backdrop-filter: blur(12px) saturate(1.2);
-}
-body .message.user {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--nico-glass-tint) 24%, transparent),
-    color-mix(in srgb, var(--nico-glass-tint) 11%, transparent)
-  ) !important;
-  border-color: color-mix(in srgb, var(--nico-glass-tint) 42%, transparent) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.45);
-  backdrop-filter: blur(16px) saturate(1.45);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.19),
-    0 10px 30px color-mix(in srgb, var(--nico-glass-tint) 18%, transparent);
-}
-body .patch-card,
-body .credits-row {
-  background-color: var(--nico-glass-control);
-  background-image: var(--nico-glass-sheen);
-  border-color: var(--nico-glass-rim);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 10px 30px rgba(0, 0, 0, 0.12);
-  -webkit-backdrop-filter: blur(16px) saturate(var(--nico-glass-saturation));
-  backdrop-filter: blur(16px) saturate(var(--nico-glass-saturation));
-}
-
-@media (max-width: 768px) {
-  :root { --nico-glass-blur: 18px; }
-  body .icon-btn,
-  body .top-header-actions button,
-  body button.mobile-menu-btn,
-  body .settings-btn,
-  body .settings-tabs .settings-tab,
-  body .welcome-suggestions button,
-  body .dropdown-item,
-  body .patch-actions button,
-  body .patch-capture button {
-    -webkit-backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
-    backdrop-filter: blur(8px) saturate(var(--nico-glass-saturation));
-  }
-}
-@media (prefers-reduced-transparency: reduce) {
-  :root { --nico-glass-blur: 0px; }
-  body .sidebar,
-  body .input-pill,
-  body .settings-panel,
-  body .admin-dashboard-panel,
-  body .artifact-panel,
-  body .gallery-panel,
-  body .palette-box,
-  body .credits-card,
-  body .add-files-dropdown,
-  body .export-dropdown,
-  body .reminder-dropdown,
-  body .auth-card,
-  body .guest-prompt,
-  body .vision-frame,
-  body .conversation-menu,
-  body .icon-btn,
-  body .top-header-actions button,
-  body button.mobile-menu-btn,
-  body .settings-btn,
-  body .quick-link,
-  body .settings-tabs .settings-tab,
-  body .welcome-suggestions button,
-  body .dropdown-item,
-  body .settings-action-btn,
-  body .vision-control,
-  body .admin-close-btn,
-  body .credits-x,
-  body .palette-hint,
-  body .patch-actions button,
-  body .patch-capture button,
-  body .conversation-menu-item,
-  body .auth-card input,
-  body .settings-panel select,
-  body .settings-panel input[type="text"],
-  body .settings-panel textarea,
-  body .palette-input,
-  body .message.user,
-  body .patch-card,
-  body .credits-row {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background-color: var(--bg-accent) !important;
-  }
-}
-@supports not ((backdrop-filter: blur(1px))) {
-  body .sidebar,
-  body .input-pill,
-  body .settings-panel,
-  body .admin-dashboard-panel,
-  body .artifact-panel,
-  body .gallery-panel,
-  body .palette-box,
-  body .credits-card,
-  body .add-files-dropdown,
-  body .export-dropdown,
-  body .reminder-dropdown,
-  body .auth-card,
-  body .guest-prompt,
-  body .vision-frame,
-  body .conversation-menu {
-    background-color: #202532 !important;
-  }
-  body.theme-light .sidebar,
-  body.theme-light .input-pill,
-  body.theme-light .settings-panel,
-  body.theme-light .admin-dashboard-panel,
-  body.theme-light .artifact-panel,
-  body.theme-light .gallery-panel,
-  body.theme-light .palette-box,
-  body.theme-light .credits-card,
-  body.theme-light .add-files-dropdown,
-  body.theme-light .export-dropdown,
-  body.theme-light .reminder-dropdown,
-  body.theme-light .auth-card,
-  body.theme-light .guest-prompt,
-  body.theme-light .vision-frame,
-  body.theme-light .conversation-menu {
-    background-color: #f7faff !important;
-  }
-}
-
-/* Keep the sidebar visually joined to the main column and quick access unboxed. */
+/* Keep the sidebar visually joined to the main column. */
 body .sidebar {
   border-radius: 0 var(--r-lg) var(--r-lg) 0 !important;
-}
-
-body .sidebar-quick .quick-link {
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-}
-body .sidebar-quick .quick-link:hover:not(:disabled) {
-  background-color: var(--nico-glass-control-hover) !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-/* The selected settings section stays white regardless of the active theme. */
-body .settings-tab-indicator {
-  background: rgba(255, 255, 255, 0.94) !important;
-  border-color: rgba(255, 255, 255, 0.94) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14) !important;
-}
-body .settings-tabs .settings-tab.is-active,
-body .settings-tabs .settings-tab[aria-selected="true"] {
-  background: #fff !important;
-  background-image: none !important;
-  color: #191919 !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 4px 14px rgba(0, 0, 0, 0.14) !important;
 }
 
 /* Align toolbar icons and labels on a consistent button box. */
@@ -3820,4 +3557,314 @@ body .vision-launch-btn > svg {
 body .settings-actions button[hidden],
 body .settings-auth-actions .auth-btn[hidden] {
   display: none !important;
+}
+
+/* Opaque liquid-glass finish: sculpted faces, polished rims, and press depth. */
+:root {
+  --nico-liquid-canvas: #171a20;
+  --nico-liquid-surface: #242a33;
+  --nico-liquid-surface-dark: #20252d;
+  --nico-liquid-surface-highlight: #343b47;
+  --nico-liquid-control: #303641;
+  --nico-liquid-control-highlight: #424b58;
+  --nico-liquid-control-hover: #3b4451;
+  --nico-liquid-edge: #778292;
+  --nico-liquid-edge-light: #c8d0dd;
+  --nico-liquid-edge-dark: #14171c;
+  --nico-liquid-shadow: #0c0e12;
+  --nico-liquid-ink: #f2f4f7;
+  --nico-liquid-muted: #b9c1cc;
+  --nico-liquid-action: #303947;
+  --nico-liquid-action-highlight: #505b6b;
+  --nico-liquid-action-ink: #ffffff;
+}
+
+body.theme-light {
+  --nico-liquid-canvas: #e2e5eb;
+  --nico-liquid-surface: #eceff3;
+  --nico-liquid-surface-dark: #e5e8ee;
+  --nico-liquid-surface-highlight: #f7f8fa;
+  --nico-liquid-control: #e0e4ea;
+  --nico-liquid-control-highlight: #f4f6f8;
+  --nico-liquid-control-hover: #f8f9fb;
+  --nico-liquid-edge: #9fa8b4;
+  --nico-liquid-edge-light: #ffffff;
+  --nico-liquid-edge-dark: #b4bcc7;
+  --nico-liquid-shadow: #b3bac4;
+  --nico-liquid-ink: #20242b;
+  --nico-liquid-muted: #56616f;
+  --nico-liquid-action: #303641;
+  --nico-liquid-action-highlight: #4a5361;
+  --nico-liquid-action-ink: #ffffff;
+}
+
+body {
+  --bg-main: var(--nico-liquid-canvas);
+  --bg-accent: var(--nico-liquid-surface);
+  --surface: var(--nico-liquid-surface);
+  --panel: var(--nico-liquid-control);
+  --line: var(--nico-liquid-edge);
+  --text-primary: var(--nico-liquid-ink);
+  --text-muted: var(--nico-liquid-muted);
+  --text-faint: var(--nico-liquid-muted);
+}
+
+body:not(.custom-background) {
+  background: linear-gradient(145deg, #252a34 0%, #1b1e25 54%, #13161b 100%) !important;
+}
+body.theme-light:not(.custom-background) {
+  background: linear-gradient(145deg, #f0f2f5 0%, #e4e7ec 55%, #d9dde4 100%) !important;
+}
+body.custom-background {
+  background-color: var(--nico-liquid-canvas) !important;
+  background-image: var(--custom-background-image) !important;
+  background-position: center !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
+
+body .app-layout,
+body .main-content,
+body .chat-container,
+body #welcomeScreen {
+  background-color: var(--nico-liquid-canvas) !important;
+}
+body.custom-background .app-layout,
+body.custom-background .main-content,
+body.custom-background .chat-container,
+body.custom-background #welcomeScreen {
+  background-image: var(--custom-background-image) !important;
+  background-position: center !important;
+  background-size: cover !important;
+  background-attachment: fixed !important;
+}
+
+body .sidebar,
+body .input-pill,
+body .settings-panel,
+body .admin-dashboard-panel,
+body .artifact-panel,
+body .gallery-panel,
+body .palette-box,
+body .credits-card,
+body .add-files-dropdown,
+body .export-dropdown,
+body .reminder-dropdown,
+body .auth-card,
+body .guest-prompt,
+body .vision-frame,
+body .conversation-menu,
+body .patch-card,
+body .credits-row {
+  background: linear-gradient(145deg, var(--nico-liquid-surface-highlight) 0%, var(--nico-liquid-surface) 54%, var(--nico-liquid-surface-dark) 100%) !important;
+  border: 1px solid var(--nico-liquid-edge) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark), 0 5px 0 var(--nico-liquid-shadow), 0 12px 20px var(--nico-liquid-shadow) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+body.theme-light .sidebar,
+body.theme-light .input-pill,
+body.theme-light .settings-panel,
+body.theme-light .admin-dashboard-panel,
+body.theme-light .artifact-panel,
+body.theme-light .gallery-panel,
+body.theme-light .palette-box,
+body.theme-light .credits-card,
+body.theme-light .add-files-dropdown,
+body.theme-light .export-dropdown,
+body.theme-light .reminder-dropdown,
+body.theme-light .auth-card,
+body.theme-light .guest-prompt,
+body.theme-light .vision-frame,
+body.theme-light .conversation-menu,
+body.theme-light .patch-card,
+body.theme-light .credits-row {
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark), 0 4px 0 var(--nico-liquid-shadow), 0 10px 16px var(--nico-liquid-shadow) !important;
+}
+
+body .icon-btn,
+body .top-header-actions button,
+body button.mobile-menu-btn,
+body .settings-btn,
+body .sidebar-quick .quick-link,
+body .settings-tabs .settings-tab,
+body .welcome-suggestions button,
+body .auth-provider-btn,
+body .guest-prompt-signin,
+body .guest-prompt-dismiss,
+body .dropdown-item,
+body .dropdown-icon,
+body .settings-action-btn,
+body .settings-actions button,
+body .settings-auth-actions .auth-btn,
+body .vision-control:not(.primary),
+body .admin-close-btn,
+body .credits-x,
+body .palette-hint,
+body .patch-actions button,
+body .patch-capture button,
+body .conversation-menu-item,
+body .artifact-btn,
+body .gallery-btn,
+body .auth-password-toggle {
+  background: linear-gradient(145deg, var(--nico-liquid-control-highlight), var(--nico-liquid-control) 58%, var(--nico-liquid-surface-dark)) !important;
+  border: 1px solid var(--nico-liquid-edge) !important;
+  color: var(--nico-liquid-ink) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark), 0 2px 0 var(--nico-liquid-shadow) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+body .sidebar-quick .quick-link:hover:not(:disabled),
+body .icon-btn:hover:not(:disabled),
+body .top-header-actions button:hover:not(:disabled),
+body button.mobile-menu-btn:hover:not(:disabled),
+body .settings-btn:hover:not(:disabled),
+body .settings-tabs .settings-tab:hover:not(:disabled),
+body .welcome-suggestions button:hover:not(:disabled),
+body .auth-provider-btn:hover:not(:disabled),
+body .guest-prompt-signin:hover:not(:disabled),
+body .dropdown-item:hover:not(:disabled),
+body .settings-action-btn:hover:not(:disabled),
+body .settings-actions button:hover:not(:disabled),
+body .settings-auth-actions .auth-btn:hover:not(:disabled),
+body .vision-control:not(.primary):hover:not(:disabled),
+body .admin-close-btn:hover:not(:disabled),
+body .credits-x:hover:not(:disabled),
+body .palette-hint:hover:not(:disabled),
+body .patch-actions button:hover:not(:disabled),
+body .patch-capture button:hover:not(:disabled),
+body .conversation-menu-item:hover:not(:disabled),
+body .artifact-btn:hover:not(:disabled),
+body .gallery-btn:hover:not(:disabled),
+body .auth-password-toggle:hover:not(:disabled) {
+  border-color: var(--nico-liquid-edge-light) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark), 0 3px 0 var(--nico-liquid-shadow) !important;
+}
+
+body .settings-tabs {
+  background: var(--nico-liquid-canvas) !important;
+}
+body .settings-tab-indicator {
+  background: linear-gradient(145deg, var(--nico-liquid-control-highlight), var(--nico-liquid-control)) !important;
+  border: 1px solid var(--nico-liquid-edge) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), 0 2px 0 var(--nico-liquid-shadow) !important;
+}
+body .settings-tabs .settings-tab.is-active,
+body .settings-tabs .settings-tab[aria-selected="true"] {
+  background: linear-gradient(145deg, var(--nico-liquid-control-highlight), var(--nico-liquid-control)) !important;
+  color: var(--nico-liquid-ink) !important;
+  border-color: var(--nico-liquid-edge-light) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark) !important;
+}
+
+body .auth-screen,
+body .panel-scrim,
+body .nico-overlay,
+body .palette-overlay {
+  background: var(--nico-liquid-canvas) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+@media (max-width: 768px), (max-height: 500px) {
+  body .sidebar-overlay.active {
+    background: rgba(12, 15, 20, 0.18) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  body.theme-light .sidebar-overlay.active {
+    background: rgba(30, 36, 46, 0.1) !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body .sidebar-overlay.active {
+    background: rgba(12, 15, 20, 0.3) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+body .auth-card {
+  color: var(--nico-liquid-ink) !important;
+}
+body .auth-card input,
+body .settings-panel select,
+body .settings-panel input[type="text"],
+body .settings-panel textarea,
+body .palette-input,
+body .admin-search,
+body .memory-input,
+body .setting-row input:not([type="checkbox"]):not([type="range"]),
+body .setting-row select,
+body .setting-row textarea {
+  background: linear-gradient(145deg, var(--nico-liquid-surface-dark), var(--nico-liquid-surface)) !important;
+  border: 1px solid var(--nico-liquid-edge) !important;
+  color: var(--nico-liquid-ink) !important;
+  box-shadow: inset 0 2px 0 var(--nico-liquid-edge-dark), inset 0 -1px 0 var(--nico-liquid-edge-light) !important;
+}
+body .auth-primary-btn,
+body .new-chat-btn,
+body .send-btn,
+body .vision-control.primary {
+  background: linear-gradient(145deg, var(--nico-liquid-action-highlight), var(--nico-liquid-action) 62%) !important;
+  border: 1px solid var(--accent) !important;
+  color: var(--nico-liquid-action-ink) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark), 0 3px 0 var(--nico-liquid-shadow) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body .auth-primary-btn:hover:not(:disabled),
+body .new-chat-btn:hover:not(:disabled),
+body .send-btn:hover:not(:disabled),
+body .vision-control.primary:hover:not(:disabled) {
+  border-color: var(--nico-liquid-edge-light) !important;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light), inset 0 -1px 0 var(--nico-liquid-edge-dark), 0 4px 0 var(--nico-liquid-shadow) !important;
+}
+
+body .message.user,
+body .code-container,
+body .drop-overlay,
+body .composer-toast,
+body .reminder-text,
+body .memory-item,
+body .gallery-viewer,
+body .artifact-body {
+  background: linear-gradient(145deg, var(--nico-liquid-surface), var(--nico-liquid-surface-dark)) !important;
+  border-color: var(--nico-liquid-edge) !important;
+  color: var(--nico-liquid-ink);
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body .drop-overlay { border: 1px solid var(--nico-liquid-edge-light) !important; }
+body .input-pill:focus-within,
+body .auth-card input:focus,
+body .settings-panel input:focus,
+body .settings-panel select:focus,
+body .settings-panel textarea:focus {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px;
+  box-shadow: inset 0 1px 0 var(--nico-liquid-edge-light) !important;
+}
+body button:focus-visible,
+body select:focus-visible,
+body input:focus-visible,
+body textarea:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 3px;
+  box-shadow: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body button,
+  body .input-pill,
+  body .settings-panel,
+  body .artifact-panel,
+  body .gallery-panel {
+    transition: none !important;
+  }
 }

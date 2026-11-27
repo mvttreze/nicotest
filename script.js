@@ -141,7 +141,8 @@ function nicoLogoInner(A, personality) {
     developer: `<rect x="150" y="222" width="212" height="64" rx="32" fill="#10151d"/><rect x="190" y="246" width="44" height="12" rx="6" style="fill:${A}"/><rect x="278" y="246" width="44" height="12" rx="6" style="fill:${A}"/><path d="M228 294 L240 302 L228 310" fill="none" style="stroke:${A}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><path d="M248 310 h16" fill="none" style="stroke:${A}" stroke-width="8" stroke-linecap="round"/>`,
   };
   const face = FACES[personality] || FACES.professional;
-  if (personality === "mica") return `<g transform="rotate(-8 256 256)">${outer}${face}</g>`;
+  if (personality === "mica")
+    return `<g transform="rotate(-8 256 256)">${outer}${face}</g>`;
   return `${outer}${face}`;
 }
 
@@ -152,7 +153,10 @@ function nicoIconSvg(accent, personality) {
 
 function updateNicoFaces() {
   try {
-    const inner = nicoLogoInner("var(--accent)", settings.personality || "professional");
+    const inner = nicoLogoInner(
+      "var(--accent)",
+      settings.personality || "professional",
+    );
     const authSvg = document.querySelector(".auth-logo svg");
     if (authSvg) authSvg.innerHTML = inner;
     const brandSvg = document.querySelector("#brandLogo svg");
@@ -163,9 +167,13 @@ function updateNicoFaces() {
 }
 
 function resolveNicoAccent() {
-  const computed = getComputedStyle(document.body).getPropertyValue("--accent").trim();
+  const computed = getComputedStyle(document.body)
+    .getPropertyValue("--accent")
+    .trim();
   if (computed) return computed;
-  const root = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+  const root = getComputedStyle(document.documentElement)
+    .getPropertyValue("--accent")
+    .trim();
   return root || NICO_MIDNIGHT_BLUE;
 }
 
@@ -286,7 +294,9 @@ async function getDesktopScreenSourceId() {
     if (!sources || !sources.length) return null;
     const screen =
       sources.find((s) => String(s.id || "").startsWith("screen:")) ||
-      sources.find((s) => /screen|display|monitor|entire/i.test(s.name || "")) ||
+      sources.find((s) =>
+        /screen|display|monitor|entire/i.test(s.name || ""),
+      ) ||
       sources[0];
     return screen.id;
   } catch {
@@ -318,7 +328,10 @@ async function startVisionMode() {
       visionStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-          mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId },
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: sourceId,
+          },
         },
       });
       preview.srcObject = visionStream;
@@ -484,7 +497,9 @@ function getConversationTitle(conversationId) {
   } catch (error) {
     /* fall through to the DOM */
   }
-  const node = document.querySelector(`.recent-item[data-conversation-id="${id}"] .recent-title`);
+  const node = document.querySelector(
+    `.recent-item[data-conversation-id="${id}"] .recent-title`,
+  );
   if (node && node.textContent.trim()) return node.textContent.trim();
   return null;
 }
@@ -498,10 +513,7 @@ function readLocalConversationList() {
 }
 
 function writeLocalConversationList(list) {
-  storageSet(
-    localConversationListKey(),
-    JSON.stringify(list.slice(0, 50)),
-  );
+  storageSet(localConversationListKey(), JSON.stringify(list.slice(0, 50)));
 }
 
 function upsertLocalConversation(conversation) {
@@ -534,7 +546,13 @@ function writeLocalConversationMessages(conversationId, messages) {
   );
 }
 
-function appendLocalConversationMessage(conversationId, role, content, attachments = [], msgId = null) {
+function appendLocalConversationMessage(
+  conversationId,
+  role,
+  content,
+  attachments = [],
+  msgId = null,
+) {
   const messages = readLocalConversationMessages(conversationId);
   messages.push({
     id: msgId || newMessageId(),
@@ -550,16 +568,14 @@ function appendLocalConversationMessage(conversationId, role, content, attachmen
 function persistCurrentConversationId() {
   storageSet("active_chat_id", currentConversationId);
   if (currentUser) {
-    storageSet(
-      `active_chat_id:${currentUser.id}`,
-      currentConversationId,
-    );
+    storageSet(`active_chat_id:${currentUser.id}`, currentConversationId);
   }
 }
 
 // Remove every locally cached conversation trace so the next account on
 // this device cannot see (or restore) the previous account's chats.
 function wipeLocalChatData() {
+  if (currentAbortController) stopGeneration();
   const doomed = [];
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
@@ -624,10 +640,7 @@ async function saveConversationAttachments(attachments) {
     );
 
     stored.push(normalized);
-    storageSet(
-      attachmentStorageKey(),
-      JSON.stringify(stored.slice(-50)),
-    );
+    storageSet(attachmentStorageKey(), JSON.stringify(stored.slice(-50)));
   } catch (error) {
     console.warn("Could not persist attachments:", error);
   }
@@ -863,7 +876,9 @@ if (addBtn) {
 function clearSelectedAttachments() {
   selectedAttachments.forEach((a) => {
     if (a?.previewUrl) {
-      try { URL.revokeObjectURL(a.previewUrl); } catch {}
+      try {
+        URL.revokeObjectURL(a.previewUrl);
+      } catch {}
     }
   });
   selectedAttachments = [];
@@ -899,7 +914,10 @@ function renderAttachments() {
       const sizeSpan = document.createElement("span");
       sizeSpan.className = "attachment-size";
       const kb = attachment.file.size / 1024;
-      sizeSpan.textContent = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`;
+      sizeSpan.textContent =
+        kb > 1024
+          ? `${(kb / 1024).toFixed(1)} MB`
+          : `${Math.max(1, Math.round(kb))} KB`;
       meta.appendChild(sizeSpan);
     }
     chip.appendChild(meta);
@@ -929,7 +947,9 @@ function selectFiles(kind) {
 function isImageFile(file) {
   const mime = (file?.type || "").toLowerCase();
   if (mime.startsWith("image/")) return true;
-  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|heic|heif)$/i.test(file?.name || "");
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|ico|heic|heif)$/i.test(
+    file?.name || "",
+  );
 }
 
 function addSelectedFiles(kind, event) {
@@ -956,11 +976,17 @@ function addSelectedFiles(kind, event) {
     }
   });
   if (others.length) renderAttachments();
-  if (added > 0 && images.length === 0) showComposerToast(added === 1 ? "File attached" : `${added} files attached`);
+  if (added > 0 && images.length === 0)
+    showComposerToast(
+      added === 1 ? "File attached" : `${added} files attached`,
+    );
 }
 
 function getPastedImageExtension(mimeType) {
-  const extension = (mimeType || "").split("/")[1]?.split(";")[0]?.toLowerCase();
+  const extension = (mimeType || "")
+    .split("/")[1]
+    ?.split(";")[0]
+    ?.toLowerCase();
   return extension === "jpeg" ? "jpg" : extension || "png";
 }
 
@@ -1002,7 +1028,8 @@ async function convertHeicToJpeg(file) {
     });
     const blob = Array.isArray(out) ? out[0] : out;
     if (!blob) return null;
-    const base = (file.name || "photo").replace(/\.(heic|heif)$/i, "") || "photo";
+    const base =
+      (file.name || "photo").replace(/\.(heic|heif)$/i, "") || "photo";
     return new File([blob], `${base}.jpg`, {
       type: "image/jpeg",
       lastModified: Date.now(),
@@ -1039,15 +1066,19 @@ async function addImageAttachments(imageFiles) {
       }
     }
     const extension = getPastedImageExtension(file.type);
-    const baseName = (file.name && !file.name.startsWith("image.") && !file.name.startsWith("blob"))
-      ? file.name
-      : `pasted-image-${Date.now()}-${index}.${extension}`;
-    const pastedFile = file instanceof File
-      ? file
-      : new File([file], baseName, {
-        type: file.type || "image/png",
-        lastModified: Date.now(),
-      });
+    const baseName =
+      file.name &&
+      !file.name.startsWith("image.") &&
+      !file.name.startsWith("blob")
+        ? file.name
+        : `pasted-image-${Date.now()}-${index}.${extension}`;
+    const pastedFile =
+      file instanceof File
+        ? file
+        : new File([file], baseName, {
+            type: file.type || "image/png",
+            lastModified: Date.now(),
+          });
 
     selectedAttachments.push({
       file: pastedFile,
@@ -1061,7 +1092,9 @@ async function addImageAttachments(imageFiles) {
   renderAttachments();
   autoGrowComposer();
   if (added > 0) {
-    showComposerToast(added === 1 ? "Image attached - press Send" : `${added} images attached`);
+    showComposerToast(
+      added === 1 ? "Image attached - press Send" : `${added} images attached`,
+    );
     userInput?.focus();
   }
 }
@@ -1070,7 +1103,9 @@ function getClipboardImageFiles(clipboard) {
   if (!clipboard) return [];
   const clipboardItems = Array.from(clipboard?.items || []);
   const itemImages = clipboardItems
-    .filter((item) => item.kind === "file" && (item.type || "").startsWith("image/"))
+    .filter(
+      (item) => item.kind === "file" && (item.type || "").startsWith("image/"),
+    )
     .map((item) => item.getAsFile())
     .filter(Boolean);
   const fileImages = Array.from(clipboard?.files || []).filter((file) =>
@@ -1110,12 +1145,18 @@ function addDroppedFiles(dataTransfer) {
     if (selectedAttachments.length >= 10) return;
     selectedAttachments.push({
       file,
-      kind: /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(file.name) || (file.type || "").startsWith("text/")
-        ? "code"
-        : "files",
-      icon: /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(file.name) || (file.type || "").startsWith("text/")
-        ? "braces"
-        : "document",
+      kind:
+        /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(
+          file.name,
+        ) || (file.type || "").startsWith("text/")
+          ? "code"
+          : "files",
+      icon:
+        /\.(c|cpp|css|html?|java|js|json|jsx|md|py|sql|ts|tsx|txt|xml|ya?ml)$/i.test(
+          file.name,
+        ) || (file.type || "").startsWith("text/")
+          ? "braces"
+          : "document",
       previewUrl: null,
     });
   });
@@ -1130,7 +1171,11 @@ function initComposerDragDrop() {
   let dragDepth = 0;
   ["dragenter", "dragover"].forEach((name) =>
     pill.addEventListener(name, (e) => {
-      if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+      if (
+        !e.dataTransfer ||
+        !Array.from(e.dataTransfer.types || []).includes("Files")
+      )
+        return;
       e.preventDefault();
       dragDepth += 1;
       pill.classList.add("drag-over");
@@ -1147,7 +1192,8 @@ function initComposerDragDrop() {
       }
       if (name === "drop") {
         e.preventDefault();
-        if (addDroppedFiles(e.dataTransfer)) showComposerToast("Files attached");
+        if (addDroppedFiles(e.dataTransfer))
+          showComposerToast("Files attached");
       }
     }),
   );
@@ -1222,17 +1268,26 @@ function readImageDataUrl(file, maxDim = 1568, quality = 0.85) {
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
-        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas
+          .getContext("2d")
+          .drawImage(image, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
-        resolve({ dataUrl: canvas.toDataURL("image/jpeg", quality), converted: true });
+        resolve({
+          dataUrl: canvas.toDataURL("image/jpeg", quality),
+          converted: true,
+        });
       } catch {
         URL.revokeObjectURL(url);
-        readFileAsDataUrl(file).then((dataUrl) => resolve({ dataUrl, converted: false }));
+        readFileAsDataUrl(file).then((dataUrl) =>
+          resolve({ dataUrl, converted: false }),
+        );
       }
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
-      readFileAsDataUrl(file).then((dataUrl) => resolve({ dataUrl, converted: false }));
+      readFileAsDataUrl(file).then((dataUrl) =>
+        resolve({ dataUrl, converted: false }),
+      );
     };
     image.src = url;
   });
@@ -1251,9 +1306,7 @@ async function buildMessageWithAttachments(message) {
       const { dataUrl, converted } = await readImageDataUrl(attachment.file);
       attachments.push({
         name: attachment.file.name,
-        mime_type: converted
-          ? "image/jpeg"
-          : attachment.file.type || "image/*",
+        mime_type: converted ? "image/jpeg" : attachment.file.type || "image/*",
         data_url: dataUrl,
       });
       continue;
@@ -1504,11 +1557,73 @@ function startTypewriterReveal(
 }
 
 function renderMarkdown(text) {
-  if (typeof marked === "undefined") return escapeHtml(text);
-  const rendered = marked.parse(text);
-  return typeof DOMPurify !== "undefined"
-    ? DOMPurify.sanitize(rendered)
-    : escapeHtml(text);
+  const source = String(text ?? "");
+  if (typeof marked === "undefined" || typeof DOMPurify === "undefined") {
+    return escapeHtml(source);
+  }
+
+  let rendered;
+  try {
+    rendered = marked.parse(source, { gfm: true, breaks: false });
+  } catch (error) {
+    console.warn(
+      "Markdown parsing failed; displaying the original text safely.",
+      error,
+    );
+    return escapeHtml(source);
+  }
+
+  const sanitizeOptions = { ADD_ATTR: ["align"] };
+  const stage = document.createElement("div");
+  stage.innerHTML = DOMPurify.sanitize(rendered, sanitizeOptions);
+
+  if (typeof renderMathInElement === "function") {
+    try {
+      renderMathInElement(stage, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "$", right: "$", display: false },
+        ],
+        ignoredTags: [
+          "script",
+          "noscript",
+          "style",
+          "textarea",
+          "pre",
+          "code",
+          "option",
+        ],
+        throwOnError: false,
+      });
+    } catch (error) {
+      console.warn(
+        "Math rendering failed; leaving the Markdown source readable.",
+        error,
+      );
+    }
+  }
+
+  if (
+    typeof hljs !== "undefined" &&
+    typeof hljs.highlightElement === "function"
+  ) {
+    stage.querySelectorAll("pre > code").forEach((code) => {
+      try {
+        const languageClass = Array.from(code.classList).find((name) =>
+          name.startsWith("language-"),
+        );
+        const language = languageClass?.slice("language-".length);
+        if (!language || hljs.getLanguage(language))
+          hljs.highlightElement(code);
+      } catch (error) {
+        console.warn("Code highlighting failed for one block.", error);
+      }
+    });
+  }
+
+  return DOMPurify.sanitize(stage.innerHTML, sanitizeOptions);
 }
 
 function escapeHtml(text) {
@@ -1581,7 +1696,63 @@ function getLastUserText() {
   return last?.dataset?.raw || users[users.length - 1].innerText || "";
 }
 
-async function streamAssistantResponse(apiMessage, apiAttachments = []) {
+function createStreamContext() {
+  return {
+    conversationId: currentConversationId,
+    userId: currentUser?.id == null ? null : String(currentUser.id),
+    persistLocally: !authClient && Boolean(currentUser),
+  };
+}
+
+function canPersistStreamLocally(context) {
+  return Boolean(
+    context?.persistLocally &&
+      !authClient &&
+      currentUser?.id != null &&
+      String(currentUser.id) === context.userId,
+  );
+}
+
+function finishStoppedAssistantResponse(
+  messageDiv,
+  contentDiv,
+  responseText,
+  streamContext,
+) {
+  const partialText = String(responseText || "");
+  contentDiv.innerHTML = partialText.trim() ? renderMarkdown(partialText) : "";
+  contentDiv.style.visibility = "visible";
+
+  const stoppedNote = document.createElement("em");
+  stoppedNote.textContent = partialText.trim()
+    ? "Generation stopped."
+    : "Generation stopped before a reply arrived.";
+  contentDiv.append(document.createElement("br"), stoppedNote);
+
+  if (!partialText.trim()) return;
+
+  attachCodeCopyButtons(messageDiv);
+  attachMessageFooter(messageDiv, "assistant", partialText);
+  if (canPersistStreamLocally(streamContext)) {
+    appendLocalConversationMessage(
+      streamContext.conversationId,
+      "assistant",
+      partialText,
+    );
+    upsertLocalConversation({
+      id: streamContext.conversationId,
+      title: "Untitled Chat",
+      user_id: currentUser.id,
+    });
+  }
+}
+
+async function streamAssistantResponse(
+  apiMessage,
+  apiAttachments = [],
+  clientMessageId = null,
+) {
+  const streamContext = createStreamContext();
   ensureTypingIndicator();
   const indicator = document.getElementById("typingIndicator");
   if (indicator) {
@@ -1615,14 +1786,17 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
       signal: currentAbortController.signal,
       body: JSON.stringify({
         message: apiMessage,
-        conversation_id: currentConversationId,
+        conversation_id: streamContext.conversationId,
         attachments: apiAttachments,
         settings,
+        client_message_id: clientMessageId,
       }),
     });
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(errorText || `Request failed with status ${response.status}`);
+      throw new Error(
+        errorText || `Request failed with status ${response.status}`,
+      );
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -1646,7 +1820,10 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
         },
       );
       setTimeout(() => {
-        if (!assistantMsgDiv.querySelector(":scope > .msg-actions") && accumulatedText) {
+        if (
+          !assistantMsgDiv.querySelector(":scope > .msg-actions") &&
+          accumulatedText
+        ) {
           attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText);
         }
       }, 4000);
@@ -1670,9 +1847,17 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
     if (sentenceBuffer.trim()) queueSentence(sentenceBuffer);
     streamComplete = true;
     typingDelayTimer = setTimeout(triggerTypingFlow, 1400);
-    if (!authClient && currentUser) {
-      appendLocalConversationMessage(currentConversationId, "assistant", accumulatedText);
-      upsertLocalConversation({ id: currentConversationId, title: "Untitled Chat", user_id: currentUser.id });
+    if (canPersistStreamLocally(streamContext)) {
+      appendLocalConversationMessage(
+        streamContext.conversationId,
+        "assistant",
+        accumulatedText,
+      );
+      upsertLocalConversation({
+        id: streamContext.conversationId,
+        title: "Untitled Chat",
+        user_id: currentUser.id,
+      });
     }
     if (settings.sound) playCompletionChime();
     loadRecentConversations();
@@ -1685,9 +1870,12 @@ async function streamAssistantResponse(apiMessage, apiAttachments = []) {
     setResponsePhase(indicator, contentDiv, "error");
     indicator?.remove();
     if (error.name === "AbortError") {
-      contentDiv.innerHTML += " <i>[Generation stopped]</i>";
-      contentDiv.style.visibility = "visible";
-      attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText || "[stopped]");
+      finishStoppedAssistantResponse(
+        assistantMsgDiv,
+        contentDiv,
+        accumulatedText,
+        streamContext,
+      );
     } else {
       contentDiv.innerText = `Error: ${error.message || "Could not connect to Nico backend."}`;
       contentDiv.style.visibility = "visible";
@@ -1712,15 +1900,26 @@ async function retryLastMessage() {
   if (lastUser) {
     const lastUserIdx = allMsgs.indexOf(lastUser);
     for (let i = allMsgs.length - 1; i > lastUserIdx; i -= 1) {
-      if (allMsgs[i].classList.contains("assistant") && !allMsgs[i].classList.contains("thinking-indicator")) {
+      if (
+        allMsgs[i].classList.contains("assistant") &&
+        !allMsgs[i].classList.contains("thinking-indicator")
+      ) {
         allMsgs[i].remove();
         break;
       }
     }
-    const retryText = lastUser.dataset?.raw || lastUser.querySelector(".content")?.innerText || lastUserText;
+    const retryText =
+      lastUser.dataset?.raw ||
+      lastUser.querySelector(".content")?.innerText ||
+      lastUserText;
     const retryImgs = collectImgsFromMessage(lastUser);
+    await persistEdit(lastUser, retryText, retryText);
     showComposerToast("Regenerating…");
-    await streamAssistantResponse(retryText, retryImgs);
+    await streamAssistantResponse(
+      retryText,
+      retryImgs,
+      lastUser.dataset.msgId || null,
+    );
     return;
   }
   userInput.value = lastUserText;
@@ -1839,7 +2038,11 @@ function startInlineEdit(msgDiv) {
     close();
     await persistEdit(msgDiv, originalText, newText);
     showComposerToast("Regenerating…");
-    await streamAssistantResponse(newText, collectImgsFromMessage(msgDiv));
+    await streamAssistantResponse(
+      newText,
+      collectImgsFromMessage(msgDiv),
+      msgDiv.dataset.msgId || null,
+    );
   });
 }
 
@@ -1870,10 +2073,12 @@ function attachMessageFooter(msgDiv, role, rawText) {
 
   const ICONS = {
     copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
-    speak: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
+    speak:
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>',
     good: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
     bad: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg>',
-    retry: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+    retry:
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
     edit: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
   };
 
@@ -1890,19 +2095,40 @@ function attachMessageFooter(msgDiv, role, rawText) {
   );
 
   if (role === "assistant") {
-    bar.appendChild(mkBtn("Read aloud", "Read aloud", ICONS.speak, () => speakText(getText())));
-    const goodBtn = mkBtn("Good response", "Good response", ICONS.good, (btn) => {
-      const active = btn.classList.toggle("active");
-      badBtn.classList.remove("active");
-      try { localStorage.setItem(`nico_feedback:${msgDiv.dataset.timestamp}`, active ? "up" : ""); } catch {}
-    });
+    bar.appendChild(
+      mkBtn("Read aloud", "Read aloud", ICONS.speak, () =>
+        speakText(getText()),
+      ),
+    );
+    const goodBtn = mkBtn(
+      "Good response",
+      "Good response",
+      ICONS.good,
+      (btn) => {
+        const active = btn.classList.toggle("active");
+        badBtn.classList.remove("active");
+        try {
+          localStorage.setItem(
+            `nico_feedback:${msgDiv.dataset.timestamp}`,
+            active ? "up" : "",
+          );
+        } catch {}
+      },
+    );
     const badBtn = mkBtn("Bad response", "Bad response", ICONS.bad, (btn) => {
       const active = btn.classList.toggle("active");
       goodBtn.classList.remove("active");
-      try { localStorage.setItem(`nico_feedback:${msgDiv.dataset.timestamp}`, active ? "down" : ""); } catch {}
+      try {
+        localStorage.setItem(
+          `nico_feedback:${msgDiv.dataset.timestamp}`,
+          active ? "down" : "",
+        );
+      } catch {}
     });
     bar.append(goodBtn, badBtn);
-    bar.appendChild(mkBtn("Retry", "Retry", ICONS.retry, () => retryLastMessage()));
+    bar.appendChild(
+      mkBtn("Retry", "Retry", ICONS.retry, () => retryLastMessage()),
+    );
   } else {
     bar.appendChild(
       mkBtn("Edit message", "Edit message", ICONS.edit, (btn) => {
@@ -1949,7 +2175,8 @@ function isFileAttachment(attachment) {
   const mime = (attachment.mime_type || "").toLowerCase();
   if (
     mime === "application/pdf" ||
-    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
     mime === "application/msword"
   ) {
     return true;
@@ -2040,7 +2267,8 @@ function appendMessage(role, text, attachments = [], msgId = null) {
       dl.className = "msg-action-btn msg-action-download";
       dl.title = "Download image";
       dl.setAttribute("aria-label", "Download image");
-      dl.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+      dl.innerHTML =
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
       dl.addEventListener("click", () =>
         downloadUrl(remote.getAttribute("src"), remote.alt || "nico-image.jpg"),
       );
@@ -2071,6 +2299,7 @@ function focusInput() {
 }
 
 function startNewChat() {
+  if (currentAbortController) stopGeneration();
   stopSpeech();
   currentConversationId = createConversationId();
   persistCurrentConversationId();
@@ -2082,6 +2311,7 @@ function startNewChat() {
 }
 
 async function switchConversation(id) {
+  if (currentAbortController) stopGeneration();
   stopSpeech();
   currentConversationId = id;
   persistCurrentConversationId();
@@ -2280,9 +2510,10 @@ function createConversationMenu(item, conversation) {
     button.className = `conversation-menu-item${danger ? " danger" : ""}`;
     button.type = "button";
     button.setAttribute("role", "menuitem");
-    const iconSvg = window.NicoIcons && window.NicoIcons.PATHS[iconName] ?
-        `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${window.NicoIcons.PATHS[iconName]}</svg>` :
-        iconName;
+    const iconSvg =
+      window.NicoIcons && window.NicoIcons.PATHS[iconName]
+        ? `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${window.NicoIcons.PATHS[iconName]}</svg>`
+        : iconName;
     button.innerHTML = `<span class="conversation-menu-icon">${iconSvg}</span><span>${label}</span>`;
     button.addEventListener("click", async (event) => {
       event.stopPropagation();
@@ -2430,7 +2661,12 @@ async function loadMessages() {
       clearChatBox();
       if (Array.isArray(data)) {
         data.forEach((msg) => {
-          appendMessage(msg.role, msg.content, msg.attachments || [], msg.client_id ?? msg.id);
+          appendMessage(
+            msg.role,
+            msg.content,
+            msg.attachments || [],
+            msg.client_id ?? msg.id,
+          );
         });
       }
       return;
@@ -2462,7 +2698,12 @@ async function loadMessages() {
         } else if (msg.role === "user") {
           attachments = storedAttachments[userMessageIndex++] || [];
         }
-        appendMessage(msg.role, msg.content, attachments, msg.client_id ?? msg.id);
+        appendMessage(
+          msg.role,
+          msg.content,
+          attachments,
+          msg.client_id ?? msg.id,
+        );
       });
     }
   } catch (err) {
@@ -2503,7 +2744,10 @@ function setSendButtonState(mode) {
   }
   if (label) label.textContent = isStop ? "Stop" : "Send";
   sendBtn.classList.toggle("is-stopping", isStop);
-  sendBtn.setAttribute("aria-label", isStop ? "Stop generating" : "Send message");
+  sendBtn.setAttribute(
+    "aria-label",
+    isStop ? "Stop generating" : "Send message",
+  );
 }
 
 function resetSendButton() {
@@ -2578,7 +2822,10 @@ function scheduleReminder(r) {
     return;
   }
   if (delay > 2147483647) return; // far future: the sweep catches it later
-  reminderTimers.set(r.id, setTimeout(() => fireReminder(r.id), delay));
+  reminderTimers.set(
+    r.id,
+    setTimeout(() => fireReminder(r.id), delay),
+  );
 }
 
 function scheduleAllReminders() {
@@ -2608,7 +2855,11 @@ function fireReminder(id) {
   } catch {}
   appendMessage("assistant", `⏰ **Reminder:** ${r.label}`, []);
   if (currentUser && !authClient) {
-    appendLocalConversationMessage(currentConversationId, "assistant", `⏰ Reminder: ${r.label}`);
+    appendLocalConversationMessage(
+      currentConversationId,
+      "assistant",
+      `⏰ Reminder: ${r.label}`,
+    );
   }
   renderReminderPanel();
 }
@@ -2638,12 +2889,20 @@ function cancelReminder(id) {
   renderReminderPanel();
 }
 
-const DURATION_RE = "(\\d+\\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d))";
+const DURATION_RE =
+  "(\\d+\\s*(?:seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d))";
 const UNIT_MS = {
-  s: 1e3, sec: 1e3, second: 1e3,
-  m: 6e4, min: 6e4, minute: 6e4,
-  h: 36e5, hr: 36e5, hour: 36e5,
-  d: 864e5, day: 864e5,
+  s: 1e3,
+  sec: 1e3,
+  second: 1e3,
+  m: 6e4,
+  min: 6e4,
+  minute: 6e4,
+  h: 36e5,
+  hr: 36e5,
+  hour: 36e5,
+  d: 864e5,
+  day: 864e5,
 };
 
 function parseDurationToMs(text) {
@@ -2688,12 +2947,20 @@ function capKind(kind) {
 function parseReminderCommand(raw) {
   const text = raw.trim();
   let m;
-  if ((m = text.match(new RegExp(`^remind me to (.+?) in ${DURATION_RE}\\b`, "i")))) {
+  if (
+    (m = text.match(
+      new RegExp(`^remind me to (.+?) in ${DURATION_RE}\\b`, "i"),
+    ))
+  ) {
     const ms = parseDurationToMs(m[2]);
     if (!ms) return null;
     return { label: m[1].trim(), dueAt: Date.now() + ms };
   }
-  if ((m = text.match(new RegExp(`^remind me in ${DURATION_RE}(?: to (.+))?$`, "i")))) {
+  if (
+    (m = text.match(
+      new RegExp(`^remind me in ${DURATION_RE}(?: to (.+))?$`, "i"),
+    ))
+  ) {
     const ms = parseDurationToMs(m[1]);
     if (!ms) return null;
     return { label: (m[2] || "Reminder").trim(), dueAt: Date.now() + ms };
@@ -2708,7 +2975,9 @@ function parseReminderCommand(raw) {
     if (at == null) return { error: true };
     return { label: (m[2] || "Reminder").trim(), dueAt: at };
   }
-  if ((m = text.match(new RegExp(`^in ${DURATION_RE} remind me to (.+)$`, "i")))) {
+  if (
+    (m = text.match(new RegExp(`^in ${DURATION_RE} remind me to (.+)$`, "i")))
+  ) {
     const ms = parseDurationToMs(m[1]);
     if (!ms) return null;
     return { label: m[2].trim(), dueAt: Date.now() + ms };
@@ -2739,7 +3008,8 @@ function parseReminderCommand(raw) {
     return { label: label || capKind(kind), dueAt: at };
   }
   if (/^remind me to (.+)$/i.test(text)) return { needTime: true };
-  if (/^(remind me|set (an? )?(alarm|timer|reminder))\b/i.test(text)) return { error: true };
+  if (/^(remind me|set (an? )?(alarm|timer|reminder))\b/i.test(text))
+    return { error: true };
   return null;
 }
 
@@ -2748,7 +3018,11 @@ async function handleReminderSend(raw) {
   if (!parsed) return false;
   appendMessage("user", raw, []);
   if (parsed.error) {
-    appendMessage("assistant", "Got it - what time? Try `in 20 minutes` or `at 7pm`.", []);
+    appendMessage(
+      "assistant",
+      "Got it - what time? Try `in 20 minutes` or `at 7pm`.",
+      [],
+    );
     return true;
   }
   if (parsed.needTime) {
@@ -2765,7 +3039,11 @@ async function handleReminderSend(raw) {
     } catch {}
   }
   const r = addReminder(parsed.label, parsed.dueAt);
-  appendMessage("assistant", `Done - I'll remind you ${fmtWhen(r.dueAt)}: **${r.label}**`, []);
+  appendMessage(
+    "assistant",
+    `Done - I'll remind you ${fmtWhen(r.dueAt)}: **${r.label}**`,
+    [],
+  );
   return true;
 }
 
@@ -2962,7 +3240,11 @@ async function handleRecallCommand(raw) {
       [],
     );
   } catch {
-    appendMessage("assistant", "Sign in first and I'll keep memories for you.", []);
+    appendMessage(
+      "assistant",
+      "Sign in first and I'll keep memories for you.",
+      [],
+    );
   }
   return true;
 }
@@ -3014,10 +3296,14 @@ async function runBriefing() {
       );
     }
   } else {
-    lines.push(`\n**Weather** - set your city in Settings → Behavior to get forecasts.`);
+    lines.push(
+      `\n**Weather** - set your city in Settings → Behavior to get forecasts.`,
+    );
   }
   const todays = readReminders()
-    .filter((r) => !r.done && new Date(r.dueAt).toDateString() === now.toDateString())
+    .filter(
+      (r) => !r.done && new Date(r.dueAt).toDateString() === now.toDateString(),
+    )
     .sort((a, b) => a.dueAt - b.dueAt);
   lines.push(
     todays.length
@@ -3039,7 +3325,9 @@ async function runBriefing() {
         }
       }),
     );
-    const titles = stories.filter(Boolean).map((s, i) => `${i + 1}. ${s.title}`);
+    const titles = stories
+      .filter(Boolean)
+      .map((s, i) => `${i + 1}. ${s.title}`);
     lines.push(
       titles.length
         ? `\n**Tech headlines**\n${titles.join("\n")}`
@@ -3150,16 +3438,21 @@ function maybeResumeWake() {
 }
 
 /* ---------- local command dispatcher (before the backend) ---------- */
-const IMAGINE_NOUNS = "images?|pictures?|photos?|photographs?|drawings?|paintings?|portraits?|sketches?|illustrations?|artworks?|art|logos?|wallpapers?|avatars?|icons?|posters?|comics?|memes?|doodles?";
-const IMAGINE_VERBS = "draw|paint|sketch|imagine|generate|create|make|give|produce|render|design|show";
+const IMAGINE_NOUNS =
+  "images?|pictures?|photos?|photographs?|drawings?|paintings?|portraits?|sketches?|illustrations?|artworks?|art|logos?|wallpapers?|avatars?|icons?|posters?|comics?|memes?|doodles?";
+const IMAGINE_VERBS =
+  "draw|paint|sketch|imagine|generate|create|make|give|produce|render|design|show";
 const IMAGINE_SOLO_VERBS = "draw|paint|sketch|imagine";
-const DOC_NOUNS = "pdfs?|docx?|docs?|documents?|reports?|letters?|essays?|resumes?|articles?|stories?|poems?";
-const DOC_VERBS = "generate|create|write|make|draft|compose|produce|prepare|build";
+const DOC_NOUNS =
+  "pdfs?|docx?|docs?|documents?|reports?|letters?|essays?|resumes?|articles?|stories?|poems?";
+const DOC_VERBS =
+  "generate|create|write|make|draft|compose|produce|prepare|build";
 // Words that mean "a real deliverable document", not an adjective inside a
 // phrase. "single-file HTML", "profile", "config file" must NOT become a PDF.
 const DOC_NOUN_CONTEXT_BLOCKERS =
   /\b(single[\s-]?file|multi[\s-]?file|config|profile|json|yaml|toml|csv|html|css|jsx|tsx|svg|markdown|source|code|repo|script|app|project|component|layout|template|stylesheet|webpage|web\s?page|landing\s?page|dashboard|image|photo|picture|icon|logo)\b/i;
-const QUESTION_STARTERS = "how|what|why|when|where|which|who|explain|define|describe|tell me|talk about|meaning of";
+const QUESTION_STARTERS =
+  "how|what|why|when|where|which|who|explain|define|describe|tell me|talk about|meaning of";
 
 function stripPoliteness(s) {
   return String(s || "")
@@ -3168,7 +3461,9 @@ function stripPoliteness(s) {
 }
 
 function isQuestion(s) {
-  return new RegExp(`^(${QUESTION_STARTERS})\\b`, "i").test(String(s || "").trim());
+  return new RegExp(`^(${QUESTION_STARTERS})\\b`, "i").test(
+    String(s || "").trim(),
+  );
 }
 
 function cleanPrompt(s) {
@@ -3193,7 +3488,10 @@ function matchImagineIntent(raw) {
   // Noun-first: cleanest prompt ("a picture of X" -> "X").
   if (hasVerb && hasNoun) {
     const afterNoun = text.replace(
-      new RegExp(`^.*?\\b(?:${IMAGINE_NOUNS})\\b\\s*(?:of|for|about|depicting|showing)?\\s*`, "i"),
+      new RegExp(
+        `^.*?\\b(?:${IMAGINE_NOUNS})\\b\\s*(?:of|for|about|depicting|showing)?\\s*`,
+        "i",
+      ),
       "",
     );
     const prompt = cleanPrompt(afterNoun);
@@ -3218,13 +3516,24 @@ function matchDocIntent(raw) {
   if (DOC_NOUN_CONTEXT_BLOCKERS.test(text)) return null;
   // Require an explicit deliverable: "pdf", "docx", or a word like essay/letter.
   const fmt = text.match(/\b(pdf|docx|word\s?document)\b/i);
-  const deliverable = fmt || /\b(essays?|resumes?|articles?|stories?|poems?|letters?|reports?|documents?)\b/i.test(text);
+  const deliverable =
+    fmt ||
+    /\b(essays?|resumes?|articles?|stories?|poems?|letters?|reports?|documents?)\b/i.test(
+      text,
+    );
   if (!deliverable) return null;
   const hasNoun = new RegExp(`\\b(${DOC_NOUNS})\\b`, "i").test(text);
   const hasVerb = new RegExp(`\\b(${DOC_VERBS})\\b`, "i").test(text);
   if (!hasNoun || !hasVerb) return null;
   const wordish = /\b(words?|docs?|resumes?|letters?)\b/i.test(text);
-  const kind = fmt ? fmt[1].toLowerCase().replace(/^word document/, "docx").replace(/^word$/, "docx") : wordish ? "docx" : "pdf";
+  const kind = fmt
+    ? fmt[1]
+        .toLowerCase()
+        .replace(/^word document/, "docx")
+        .replace(/^word$/, "docx")
+    : wordish
+      ? "docx"
+      : "pdf";
   let topic = text.replace(
     new RegExp(`^.*?\\b(?:${DOC_NOUNS})\\b\\s*(?:about|on|of|for)?\\s*`, "i"),
     "",
@@ -3264,7 +3573,11 @@ async function handleCliCommand(task, tool, raw) {
   try {
     result = await shell.runCli(task, tool);
   } catch (error) {
-    appendMessage("assistant", `CLI run failed: ${(error && error.message) || error}`, []);
+    appendMessage(
+      "assistant",
+      `CLI run failed: ${(error && error.message) || error}`,
+      [],
+    );
     return true;
   }
   if (result && result.ok) {
@@ -3275,7 +3588,11 @@ async function handleCliCommand(task, tool, raw) {
       [],
     );
   } else {
-    appendMessage("assistant", `CLI run failed: ${(result && result.error) || "unknown error"}`, []);
+    appendMessage(
+      "assistant",
+      `CLI run failed: ${(result && result.error) || "unknown error"}`,
+      [],
+    );
   }
   return true;
 }
@@ -3287,12 +3604,20 @@ async function maybeHandleLocalCommand(raw) {
   // still fall through with the original input untouched.
   const cmd = text.replace(/^(hey nico|nico)[,:]?\s+/i, "");
   // CLI hands (desktop app only): "/cli <task>" or "/cli <tool> <task>".
-  const cliM = cmd.match(/^\/cli(?:\s+(claude|opencode|codex))?\s+([\s\S]{3,4000})$/i);
+  const cliM = cmd.match(
+    /^\/cli(?:\s+(claude|opencode|codex))?\s+([\s\S]{3,4000})$/i,
+  );
   if (cliM) {
-    return await handleCliCommand(cliM[2].trim(), (cliM[1] || "claude").toLowerCase(), text);
+    return await handleCliCommand(
+      cliM[2].trim(),
+      (cliM[1] || "claude").toLowerCase(),
+      text,
+    );
   }
   if (
-    /^(remind me|set an? (alarm|timer|reminder)|in \d+\s*\w+ remind me)\b/i.test(cmd)
+    /^(remind me|set an? (alarm|timer|reminder)|in \d+\s*\w+ remind me)\b/i.test(
+      cmd,
+    )
   ) {
     return await handleReminderSend(cmd);
   }
@@ -3306,7 +3631,9 @@ async function maybeHandleLocalCommand(raw) {
     renderReminderPanel();
     appendMessage(
       "assistant",
-      n ? `Cleared ${n} reminder${n === 1 ? "" : "s"}.` : "No active reminders to clear.",
+      n
+        ? `Cleared ${n} reminder${n === 1 ? "" : "s"}.`
+        : "No active reminders to clear.",
       [],
     );
     return true;
@@ -3321,7 +3648,9 @@ async function maybeHandleLocalCommand(raw) {
   ) {
     return await handleRecallCommand(cmd);
   }
-  const cityM = cmd.match(/^(?:set(?: my)? city (?:to|as) |my city is )(.{2,60})$/i);
+  const cityM = cmd.match(
+    /^(?:set(?: my)? city (?:to|as) |my city is )(.{2,60})$/i,
+  );
   if (cityM) {
     appendMessage("user", text, []);
     settings.briefCity = cityM[1].trim();
@@ -3333,7 +3662,11 @@ async function maybeHandleLocalCommand(raw) {
     );
     return true;
   }
-  if (/^(good morning|morning|briefing|daily briefing|morning briefing)!?\s*$/i.test(cmd)) {
+  if (
+    /^(good morning|morning|briefing|daily briefing|morning briefing)!?\s*$/i.test(
+      cmd,
+    )
+  ) {
     await runBriefing();
     return true;
   }
@@ -3342,7 +3675,9 @@ async function maybeHandleLocalCommand(raw) {
     (m = cmd.match(
       /^(?:please\s+|can you\s+)?(export|download)( this)?( chat| conversation)?( as| to| in)? (pdf|word|docx|doc|markdown|md|json)$/i,
     )) ||
-    (m = cmd.match(/^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)(?: doc| document| file)?$/i))
+    (m = cmd.match(
+      /^make this (chat|conversation)? ?(a |into a )?(pdf|word|docx|doc)(?: doc| document| file)?$/i,
+    ))
   ) {
     let fmt = (m[m.length - 1] || "").toLowerCase();
     if (fmt === "doc") fmt = "docx";
@@ -3361,7 +3696,9 @@ async function maybeHandleLocalCommand(raw) {
   );
   let followKind = null;
   if (!fm) {
-    const gm = cmd.match(/^(?:can you\s+)?generate (?:that|this|the) image into\s+(.+)$/i);
+    const gm = cmd.match(
+      /^(?:can you\s+)?generate (?:that|this|the) image into\s+(.+)$/i,
+    );
     if (gm) {
       fm = gm;
       followKind = "image";
@@ -3375,7 +3712,9 @@ async function maybeHandleLocalCommand(raw) {
     }
   }
   if (!fm) {
-    const dm = cmd.match(/^(?:draw|paint|sketch|redraw|repaint) (it|this|that|them)\s*(.*)$/i);
+    const dm = cmd.match(
+      /^(?:draw|paint|sketch|redraw|repaint) (it|this|that|them)\s*(.*)$/i,
+    );
     if (dm) {
       fm = [dm[0], (dm[2] || "").trim() || "again"];
       followKind = "image";
@@ -3383,19 +3722,28 @@ async function maybeHandleLocalCommand(raw) {
   }
   if (fm) {
     const rest = (fm[fm.length - 1] || "").trim();
-    const ref = cmd.match(/\b(image|picture|photo|document|file|pdf|docx?|doc)\b/i);
-    const want = followKind
-      || (ref && /^(image|picture|photo)$/i.test(ref[1]) ? "image"
-        : ref && /^(document|file|pdf|docx?|doc)$/i.test(ref[1]) ? "doc"
-        : null);
+    const ref = cmd.match(
+      /\b(image|picture|photo|document|file|pdf|docx?|doc)\b/i,
+    );
+    const want =
+      followKind ||
+      (ref && /^(image|picture|photo)$/i.test(ref[1])
+        ? "image"
+        : ref && /^(document|file|pdf|docx?|doc)$/i.test(ref[1])
+          ? "doc"
+          : null);
     const last = findLastGen(want);
     if (last && rest) {
       if (last.type === "image") {
-        const base = /^again$/i.test(rest) ? last.prompt : `${rest} (variation of: ${last.prompt})`;
+        const base = /^again$/i.test(rest)
+          ? last.prompt
+          : `${rest} (variation of: ${last.prompt})`;
         await handleImagine(base, text);
         return true;
       }
-      const base = /^again$/i.test(rest) ? last.topic : `${rest} (revising: ${last.topic})`;
+      const base = /^again$/i.test(rest)
+        ? last.topic
+        : `${rest} (revising: ${last.topic})`;
       await handleGenerateDoc(last.kind || "pdf", base, text);
       return true;
     }
@@ -3416,7 +3764,11 @@ async function maybeHandleLocalCommand(raw) {
   if (imgIntent) {
     if (imgIntent.ask) {
       appendMessage("user", text, []);
-      appendMessage("assistant", "Describe the image first - e.g. `draw a robot at sunset`.", []);
+      appendMessage(
+        "assistant",
+        "Describe the image first - e.g. `draw a robot at sunset`.",
+        [],
+      );
       return true;
     }
     await handleImagine(imgIntent.prompt, text);
@@ -3426,7 +3778,11 @@ async function maybeHandleLocalCommand(raw) {
   if (docIntent) {
     if (docIntent.ask) {
       appendMessage("user", text, []);
-      appendMessage("assistant", "What should the document cover? (e.g. `write a pdf about sourdough`)", []);
+      appendMessage(
+        "assistant",
+        "What should the document cover? (e.g. `write a pdf about sourdough`)",
+        [],
+      );
       return true;
     }
     await handleGenerateDoc(docIntent.kind, docIntent.topic, text);
@@ -3570,11 +3926,20 @@ function findLastGen(prefer) {
 }
 
 async function handleGenerateDoc(kind, topic, display) {
-  topic = String(topic || "").replace(/\([^)]*title[^)]*\)/gi, "").replace(/\s{2,}/g, " ").trim();
-  const shown = (display || `Make a ${kind} about ${topic}`).trim() || `Make a ${kind} file`;
+  topic = String(topic || "")
+    .replace(/\([^)]*title[^)]*\)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const shown =
+    (display || `Make a ${kind} about ${topic}`).trim() ||
+    `Make a ${kind} file`;
   appendMessage("user", shown, []);
   if (!topic) {
-    appendMessage("assistant", "Give me a topic first - e.g. `make a pdf about sourdough`.", []);
+    appendMessage(
+      "assistant",
+      "Give me a topic first - e.g. `make a pdf about sourdough`.",
+      [],
+    );
     return;
   }
   const title = docTitleFromTopic(topic);
@@ -3593,7 +3958,12 @@ async function handleGenerateDoc(kind, topic, display) {
     });
     if (!res.ok) throw new Error("build failed");
     const ext = kind === "docx" ? "docx" : "pdf";
-    const safe = title.toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "nico";
+    const safe =
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40) || "nico";
     const blob = await res.blob();
     const dataUrl = await readFileAsDataUrl(blob);
     const filename = `${safe}.${ext}`;
@@ -3610,15 +3980,21 @@ async function handleGenerateDoc(kind, topic, display) {
         user_id: currentUser.id,
       });
       appendLocalConversationMessage(currentConversationId, "user", shown);
-      appendLocalConversationMessage(currentConversationId, "assistant", `Here's your ${ext.toUpperCase()} on **${topic}**:`, [
-        {
-          name: filename,
-          mime_type: ext === "docx"
-            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            : "application/pdf",
-          data_url: dataUrl,
-        },
-      ]);
+      appendLocalConversationMessage(
+        currentConversationId,
+        "assistant",
+        `Here's your ${ext.toUpperCase()} on **${topic}**:`,
+        [
+          {
+            name: filename,
+            mime_type:
+              ext === "docx"
+                ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                : "application/pdf",
+            data_url: dataUrl,
+          },
+        ],
+      );
     }
     // A generated document is a real exchange: refresh Recents so the chat shows
     // up in the sidebar immediately instead of only after a reload.
@@ -3678,7 +4054,11 @@ async function handleImagine(prompt, display) {
   const shown = (display || prompt || "").trim() || prompt;
   appendMessage("user", shown, []);
   if (!prompt) {
-    appendMessage("assistant", "Describe the image first - e.g. `draw a robot at sunset`.", []);
+    appendMessage(
+      "assistant",
+      "Describe the image first - e.g. `draw a robot at sunset`.",
+      [],
+    );
     return;
   }
   showThinking();
@@ -3687,7 +4067,11 @@ async function handleImagine(prompt, display) {
       allowGuest: true,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, display: shown, conversation_id: currentConversationId }),
+      body: JSON.stringify({
+        prompt,
+        display: shown,
+        conversation_id: currentConversationId,
+      }),
     });
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}));
@@ -3701,7 +4085,11 @@ async function handleImagine(prompt, display) {
         data_url: data.image_url,
       },
     ];
-    appendMessage("assistant", `**${data.prompt || prompt}**`, imagineAttachments);
+    appendMessage(
+      "assistant",
+      `**${data.prompt || prompt}**`,
+      imagineAttachments,
+    );
     if (currentUser && !authClient) {
       upsertLocalConversation({
         id: currentConversationId,
@@ -3720,10 +4108,15 @@ async function handleImagine(prompt, display) {
     // in the sidebar immediately instead of only after a reload.
     loadRecentConversations();
   } catch (error) {
-    const reason = error?.message && error.message !== "render failed"
-      ? ` (${String(error.message).slice(0, 200)})`
-      : "";
-    appendMessage("assistant", `I couldn't render that image${reason} - try again in a bit.`, []);
+    const reason =
+      error?.message && error.message !== "render failed"
+        ? ` (${String(error.message).slice(0, 200)})`
+        : "";
+    appendMessage(
+      "assistant",
+      `I couldn't render that image${reason} - try again in a bit.`,
+      [],
+    );
   } finally {
     hideThinking();
   }
@@ -3732,7 +4125,10 @@ async function handleImagine(prompt, display) {
 async function sendMessage() {
   const typedMessage = userInput.value.trim();
   if (!typedMessage && selectedAttachments.length === 0) return;
-  if (!selectedAttachments.length && (await maybeHandleLocalCommand(typedMessage))) {
+  if (
+    !selectedAttachments.length &&
+    (await maybeHandleLocalCommand(typedMessage))
+  ) {
     userInput.value = "";
     autoGrowComposer();
     return;
@@ -3762,7 +4158,12 @@ async function sendMessage() {
 
   stopSpeech();
   const userMsgId = newMessageId();
-  appendMessage("user", displayMessage, attachmentRequest.attachments, userMsgId);
+  appendMessage(
+    "user",
+    displayMessage,
+    attachmentRequest.attachments,
+    userMsgId,
+  );
   if (currentUser) {
     await saveConversationAttachments(attachmentRequest.attachments);
     if (!authClient) {
@@ -3784,11 +4185,15 @@ async function sendMessage() {
   autoGrowComposer();
   selectedAttachments.forEach((a) => {
     if (a?.previewUrl) {
-      try { URL.revokeObjectURL(a.previewUrl); } catch {}
+      try {
+        URL.revokeObjectURL(a.previewUrl);
+      } catch {}
     }
   });
   selectedAttachments = [];
   renderAttachments();
+
+  const streamContext = createStreamContext();
 
   ensureTypingIndicator();
   const indicator = document.getElementById("typingIndicator");
@@ -3832,7 +4237,7 @@ async function sendMessage() {
       signal: currentAbortController.signal,
       body: JSON.stringify({
         message: message,
-        conversation_id: currentConversationId,
+        conversation_id: streamContext.conversationId,
         attachments: attachmentRequest.attachments,
         settings,
         client_message_id: userMsgId,
@@ -3870,7 +4275,10 @@ async function sendMessage() {
       );
       // Fallback: if stream was empty, still add footer so quick buttons show
       setTimeout(() => {
-        if (!assistantMsgDiv.querySelector(":scope > .msg-actions") && accumulatedText) {
+        if (
+          !assistantMsgDiv.querySelector(":scope > .msg-actions") &&
+          accumulatedText
+        ) {
           attachMessageFooter(assistantMsgDiv, "assistant", accumulatedText);
         }
       }, 4000);
@@ -3904,14 +4312,14 @@ async function sendMessage() {
     streamComplete = true;
     typingDelayTimer = setTimeout(triggerTypingFlow, 1400);
 
-    if (!authClient && currentUser) {
+    if (canPersistStreamLocally(streamContext)) {
       appendLocalConversationMessage(
-        currentConversationId,
+        streamContext.conversationId,
         "assistant",
         accumulatedText,
       );
       upsertLocalConversation({
-        id: currentConversationId,
+        id: streamContext.conversationId,
         title: "Untitled Chat",
         user_id: currentUser.id,
       });
@@ -3928,9 +4336,12 @@ async function sendMessage() {
     setResponsePhase(indicator, contentDiv, "error");
     indicator?.remove();
     if (error.name === "AbortError") {
-      contentDiv.innerHTML += " <i>[Generation stopped]</i>";
-      contentDiv.style.visibility = "visible";
-      attachMessageFooter(assistantMsgDiv, "assistant", contentDiv.innerText || "[Generation stopped]");
+      finishStoppedAssistantResponse(
+        assistantMsgDiv,
+        contentDiv,
+        accumulatedText,
+        streamContext,
+      );
     } else {
       contentDiv.innerText = `Error: ${error.message || "Could not connect to Nico backend."}`;
       contentDiv.style.visibility = "visible";
@@ -4057,11 +4468,16 @@ function handleCommand(commandText) {
 }
 
 function exportChat() {
-  const messages = Array.from(chatBox.querySelectorAll(".message:not(.thinking-indicator)"));
+  const messages = Array.from(
+    chatBox.querySelectorAll(".message:not(.thinking-indicator)"),
+  );
 
   if (messages.length === 0) return alert("No messages to export.");
 
-  downloadBlob(new Blob([chatToMarkdown()], { type: "text/markdown" }), `chat-${currentConversationId}.md`);
+  downloadBlob(
+    new Blob([chatToMarkdown()], { type: "text/markdown" }),
+    `chat-${currentConversationId}.md`,
+  );
 }
 
 function wireExportMenu() {
@@ -4077,8 +4493,12 @@ function wireExportMenu() {
     toggleExportMenu(false);
     exportChatJson();
   });
-  document.getElementById("exportPdfBtn")?.addEventListener("click", exportCurrentPdf);
-  document.getElementById("exportDocxBtn")?.addEventListener("click", () => exportCurrentDocx(false));
+  document
+    .getElementById("exportPdfBtn")
+    ?.addEventListener("click", exportCurrentPdf);
+  document
+    .getElementById("exportDocxBtn")
+    ?.addEventListener("click", () => exportCurrentDocx(false));
   document.addEventListener("click", (event) => {
     if (
       !event.target.closest("#exportBtn") &&
@@ -4100,12 +4520,12 @@ function downloadFile(filename, content, type) {
 }
 
 function exportChatJson() {
-  const messages = Array.from(chatBox.querySelectorAll(".message:not(.thinking-indicator)")).map(
-    (msg) => ({
-      role: msg.classList.contains("user") ? "user" : "assistant",
-      content: msg.querySelector(".content")?.innerText || "",
-    }),
-  );
+  const messages = Array.from(
+    chatBox.querySelectorAll(".message:not(.thinking-indicator)"),
+  ).map((msg) => ({
+    role: msg.classList.contains("user") ? "user" : "assistant",
+    content: msg.querySelector(".content")?.innerText || "",
+  }));
   if (!messages.length) return alert("No messages to export.");
   downloadFile(
     `chat-${currentConversationId}.json`,
@@ -4182,9 +4602,12 @@ function initializeSettingsPanel() {
       if (key === "fontScale") settings.fontScale = Number(control.value);
       if (key === "personality") {
         syncDeveloperModePreference();
-        if ((settings.personality === "mica" && !canUseMica()) ||
-            (settings.personality === "brainrot" && !canUseMica()) ||
-            (settings.personality === "developer" && !isDeveloperAccountUser(currentUser))) {
+        if (
+          (settings.personality === "mica" && !canUseMica()) ||
+          (settings.personality === "brainrot" && !canUseMica()) ||
+          (settings.personality === "developer" &&
+            !isDeveloperAccountUser(currentUser))
+        ) {
           settings.personality = "professional";
           control.value = "professional";
         }
@@ -4353,8 +4776,14 @@ let guestPromptDismissed = false;
 function getDeviceId() {
   let id = localStorage.getItem("nico_device_id");
   if (!id) {
-    id = "dev-" + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
-    try { localStorage.setItem("nico_device_id", id); } catch {}
+    id =
+      "dev-" +
+      (crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2));
+    try {
+      localStorage.setItem("nico_device_id", id);
+    } catch {}
   }
   return id;
 }
@@ -4374,14 +4803,17 @@ function incrementGuestQuota() {
   const quota = readGuestQuota();
   quota.count += 1;
   try {
-    localStorage.setItem(GUEST_QUOTA_KEY, JSON.stringify({ count: quota.count, day: new Date().toDateString() }));
+    localStorage.setItem(
+      GUEST_QUOTA_KEY,
+      JSON.stringify({ count: quota.count, day: new Date().toDateString() }),
+    );
   } catch {}
   return quota.count;
 }
 
 function showGuestSignInPrompt(force) {
   const prompt = document.getElementById("guestPrompt");
-  if (!prompt || guestPromptDismissed && !force) return;
+  if (!prompt || (guestPromptDismissed && !force)) return;
   prompt.classList.remove("hidden");
 }
 
@@ -4401,7 +4833,9 @@ async function signInAsGuest() {
   // so the auth-state-change listener doesn't flip us back to the login
   // screen after we set the guest session below.
   if (typeof authClient !== "undefined" && authClient) {
-    try { await authClient.auth.signOut(); } catch {}
+    try {
+      await authClient.auth.signOut();
+    } catch {}
   }
 
   const deviceId = getDeviceId();
@@ -4441,9 +4875,12 @@ function enforceMicaBadge() {
   const personalityControl = document.getElementById("personalitySetting");
   if (!personalityControl) return;
   refreshPersonalityOptions();
-  if ((settings.personality === "mica" && !canUseMica()) ||
-      (settings.personality === "brainrot" && !canUseMica()) ||
-      (settings.personality === "developer" && !isDeveloperAccountUser(currentUser))) {
+  if (
+    (settings.personality === "mica" && !canUseMica()) ||
+    (settings.personality === "brainrot" && !canUseMica()) ||
+    (settings.personality === "developer" &&
+      !isDeveloperAccountUser(currentUser))
+  ) {
     settings.personality = "professional";
     personalityControl.value = "professional";
     saveSettings();
@@ -4455,28 +4892,41 @@ function refreshPersonalityOptions() {
   const personalityControl = document.getElementById("personalitySetting");
   if (!personalityControl) return;
   const micaOption = personalityControl.querySelector('option[value="mica"]');
-  const brainrotOption = personalityControl.querySelector('option[value="brainrot"]');
-  const developerOption = personalityControl.querySelector('option[value="developer"]');
+  const brainrotOption = personalityControl.querySelector(
+    'option[value="brainrot"]',
+  );
+  const developerOption = personalityControl.querySelector(
+    'option[value="developer"]',
+  );
   if (micaOption) micaOption.hidden = !canUseMica();
   if (brainrotOption) brainrotOption.hidden = !canUseMica();
-  if (developerOption) developerOption.hidden = !isDeveloperAccountUser(currentUser);
+  if (developerOption)
+    developerOption.hidden = !isDeveloperAccountUser(currentUser);
   const micaBlocked = settings.personality === "mica" && !canUseMica();
   const brainrotBlocked = settings.personality === "brainrot" && !canUseMica();
-  const developerBlocked = settings.personality === "developer" && !isDeveloperAccountUser(currentUser);
+  const developerBlocked =
+    settings.personality === "developer" &&
+    !isDeveloperAccountUser(currentUser);
   if (micaBlocked || brainrotBlocked || developerBlocked) {
     settings.personality = "professional";
     personalityControl.value = "professional";
     saveSettings();
     applySettings();
   }
-  const quickTone = document.querySelector('#modeChips select[aria-label="Tone"]');
+  const quickTone = document.querySelector(
+    '#modeChips select[aria-label="Tone"]',
+  );
   if (quickTone) {
     const selected = settings.personality;
     quickTone.replaceChildren();
     Array.from(personalityControl.options)
       .filter((option) => !option.hidden)
-      .forEach((option) => quickTone.add(new Option(option.text, option.value)));
-    quickTone.value = Array.from(quickTone.options).some((option) => option.value === selected)
+      .forEach((option) =>
+        quickTone.add(new Option(option.text, option.value)),
+      );
+    quickTone.value = Array.from(quickTone.options).some(
+      (option) => option.value === selected,
+    )
       ? selected
       : "professional";
   }
@@ -4674,6 +5124,14 @@ async function submitDemoAuth(action = "login", username, password) {
       throw new Error(error.message || "Could not restore sign-in session");
     updateAuthUi(data.session?.user || demoUser);
   } else {
+    if (
+      action === "signup" &&
+      demoUser.id &&
+      !String(demoUser.id).startsWith("demo-") &&
+      !token
+    ) {
+      return { ...demoUser, confirmationRequired: true };
+    }
     if (token) {
       storageSet("nico_demo_auth_token", token);
       storageSet("nico_demo_user", JSON.stringify(demoUser));
@@ -4689,6 +5147,10 @@ function initializeAuthScreen() {
   const passwordInput = document.getElementById("authPassword");
   const passwordToggle = document.getElementById("authPasswordToggle");
   const submitButton = document.getElementById("authSubmitBtn");
+  const submitLabel = document.getElementById("authSubmitLabel");
+  const authTitle = document.getElementById("authTitle");
+  const authFooterPrompt = document.getElementById("authFooterPrompt");
+  const authFeedback = document.getElementById("authFeedback");
   const createAccountLink = document.getElementById("createAccountLink");
   const googleButton = document.getElementById("authGoogleBtn");
   const appleButton = document.getElementById("authAppleBtn");
@@ -4710,7 +5172,7 @@ function initializeAuthScreen() {
     const paths = window.NicoIcons?.PATHS || {};
     const closedEye =
       paths["eye-closed"] ||
-      '<path d="M1.5 6c0-1.103 1.397-2 3-2s3 .897 3 2-1.397 2-3 2-3-.897-3-2z"/><path d="M1 12a6 6 0 1 1 12 0A6 6 0 0 1 1 12z"/><circle cx="8" cy="6" r="1"/>';
+      '<path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z"/><circle cx="8" cy="8" r="1.8"/><path d="m2 2 12 12"/>';
     const openEye =
       paths.eye ||
       '<path d="M1.5 8s2.4-4 6.5-4 6.5 4 6.5 4-2.4 4-6.5 4-6.5-4-6.5-4z"/><circle cx="8" cy="8" r="1.8"/>';
@@ -4720,17 +5182,22 @@ function initializeAuthScreen() {
 
   let authMode = "login";
 
+  const setSubmitLabel = (label) => {
+    if (submitLabel) submitLabel.textContent = label;
+    else if (submitButton) submitButton.textContent = label;
+  };
+
   const setAuthMode = (mode) => {
-    authMode = mode;
-    if (submitButton) {
-      submitButton.textContent =
-        mode === "signup" ? "Create account" : "Sign in";
+    authMode = mode === "signup" ? "signup" : "login";
+    const isSignup = authMode === "signup";
+    if (authTitle) authTitle.textContent = isSignup ? "Create your account" : "Sign in to Nico";
+    passwordInput.autocomplete = isSignup ? "new-password" : "current-password";
+    setSubmitLabel(isSignup ? "Create account" : "Sign in");
+    if (authFooterPrompt) {
+      authFooterPrompt.textContent = isSignup ? "Already have an account?" : "New to Nico?";
     }
     if (createAccountLink) {
-      createAccountLink.textContent =
-        mode === "signup"
-          ? "Already have an account? Sign in"
-          : "Create an account";
+      createAccountLink.textContent = isSignup ? "Sign in" : "Create an account";
     }
   };
 
@@ -4745,25 +5212,38 @@ function initializeAuthScreen() {
     }
 
     try {
+      if (authFeedback) {
+        authFeedback.hidden = true;
+        authFeedback.textContent = "";
+      }
       if (submitButton) submitButton.disabled = true;
-      submitButton.textContent =
-        authMode === "signup" ? "Creating account..." : "Signing in...";
+      setSubmitLabel(authMode === "signup" ? "Creating account..." : "Signing in...");
 
-      await submitDemoAuth(authMode, value, password);
+      const result = await submitDemoAuth(authMode, value, password);
       form.reset();
+      if (result?.confirmationRequired) {
+        setAuthMode("login");
+        if (authFeedback) {
+          authFeedback.textContent = "Check your email to confirm your account, then sign in.";
+          authFeedback.hidden = false;
+        }
+      }
     } catch (error) {
       alert(error.message || "Authentication failed");
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
-        submitButton.textContent =
-          authMode === "signup" ? "Create account" : "Sign in";
+        setSubmitLabel(authMode === "signup" ? "Create account" : "Sign in");
       }
     }
   });
 
   createAccountLink?.addEventListener("click", (event) => {
     event.preventDefault();
+    if (authFeedback) {
+      authFeedback.hidden = true;
+      authFeedback.textContent = "";
+    }
     setAuthMode(authMode === "login" ? "signup" : "login");
   });
 
@@ -4892,25 +5372,27 @@ function renderAdminTabs(content, overview, stats) {
   tabs.className = "admin-tabs";
   tabs.setAttribute("role", "tablist");
   tabs.setAttribute("aria-label", "Developer dashboard sections");
-  ["overview", "chats", "users", "controls", "logs", "patches"].forEach((name) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `admin-tab${adminActiveTab === name ? " is-active" : ""}`;
-    btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-    btn.setAttribute("role", "tab");
-    btn.setAttribute("aria-selected", String(adminActiveTab === name));
-    btn.setAttribute("aria-controls", "adminTabBody");
-    btn.addEventListener("click", async () => {
-      adminActiveTab = name;
-      tabs.querySelectorAll(".admin-tab").forEach((tab) => {
-        const selected = tab === btn;
-        tab.classList.toggle("is-active", selected);
-        tab.setAttribute("aria-selected", String(selected));
+  ["overview", "chats", "users", "controls", "logs", "patches"].forEach(
+    (name) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `admin-tab${adminActiveTab === name ? " is-active" : ""}`;
+      btn.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      btn.setAttribute("role", "tab");
+      btn.setAttribute("aria-selected", String(adminActiveTab === name));
+      btn.setAttribute("aria-controls", "adminTabBody");
+      btn.addEventListener("click", async () => {
+        adminActiveTab = name;
+        tabs.querySelectorAll(".admin-tab").forEach((tab) => {
+          const selected = tab === btn;
+          tab.classList.toggle("is-active", selected);
+          tab.setAttribute("aria-selected", String(selected));
+        });
+        await renderAdminTab(content, name, stats, overview);
       });
-      await renderAdminTab(content, name, stats, overview);
-    });
-    tabs.appendChild(btn);
-  });
+      tabs.appendChild(btn);
+    },
+  );
   const body = document.createElement("div");
   body.id = "adminTabBody";
   body.className = "admin-tab-body";
@@ -4953,11 +5435,19 @@ function renderAdminOverview(body, stats, overview = {}) {
     <div class="admin-section">
       <h3>Messages / day</h3>
       <div class="admin-chart">
-        ${activity.length ? activity.map((a) => `
+        ${
+          activity.length
+            ? activity
+                .map(
+                  (a) => `
           <div class="admin-bar" title="${adminEsc(a.date)}: ${a.messages}">
             <span style="height:${Math.max(4, Math.round((a.messages / peak) * 72))}px"></span>
             <small>${adminEsc(a.date.slice(5))}</small>
-          </div>`).join("") : '<div class="admin-log-item"><time>-</time>No activity yet.</div>'}
+          </div>`,
+                )
+                .join("")
+            : '<div class="admin-log-item"><time>-</time>No activity yet.</div>'
+        }
       </div>
     </div>
     <div class="admin-section">
@@ -5005,7 +5495,8 @@ async function renderAdminChats(body, query = "") {
   const list = document.createElement("div");
   list.className = "admin-log-list";
   if (!rows.length) {
-    list.innerHTML = '<div class="admin-log-item"><time>-</time>No conversations found.</div>';
+    list.innerHTML =
+      '<div class="admin-log-item"><time>-</time>No conversations found.</div>';
   }
   rows.forEach((convo) => {
     const item = document.createElement("div");
@@ -5029,7 +5520,9 @@ async function renderAdminChats(body, query = "") {
       detail.hidden = false;
       detail.innerHTML = `<div class="admin-loading">Loading messages…</div>`;
       try {
-        const data = await adminFetch(`/admin/conversations/${convo.id}/messages`);
+        const data = await adminFetch(
+          `/admin/conversations/${convo.id}/messages`,
+        );
         detail.innerHTML = "";
         (data.messages || []).forEach((m) => {
           const row = document.createElement("div");
@@ -5042,7 +5535,8 @@ async function renderAdminChats(body, query = "") {
           detail.appendChild(row);
         });
         if (!data.messages?.length) {
-          detail.innerHTML = '<div class="admin-log-item"><time>-</time>No messages.</div>';
+          detail.innerHTML =
+            '<div class="admin-log-item"><time>-</time>No messages.</div>';
         }
       } catch (error) {
         detail.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
@@ -5068,8 +5562,13 @@ async function renderAdminChats(body, query = "") {
     del.className = "danger";
     del.textContent = "Delete";
     del.addEventListener("click", async () => {
-      if (!confirm(`Delete "${convo.title || "Untitled"}" and all its messages?`)) return;
-      await adminFetch(`/admin/conversations/${convo.id}`, { method: "DELETE" });
+      if (
+        !confirm(`Delete "${convo.title || "Untitled"}" and all its messages?`)
+      )
+        return;
+      await adminFetch(`/admin/conversations/${convo.id}`, {
+        method: "DELETE",
+      });
       item.remove();
     });
     actions.append(rename, del);
@@ -5093,7 +5592,8 @@ async function renderAdminUsers(body) {
   ]);
   const heldByUser = new Map();
   (grantData.badges || []).forEach((entry) => {
-    if (!heldByUser.has(entry.user_id)) heldByUser.set(entry.user_id, new Set());
+    if (!heldByUser.has(entry.user_id))
+      heldByUser.set(entry.user_id, new Set());
     heldByUser.get(entry.user_id).add(entry.badge);
   });
   const refreshUsers = () => renderAdminUsers(body);
@@ -5171,7 +5671,11 @@ async function renderAdminUsers(body) {
     (heldByUser.get(String(id)) || new Set()).forEach((b) =>
       chips.appendChild(badgeChip(b, email)),
     );
-    row.append(info, chips, grantControls(email, heldByUser.get(String(id)) || new Set()));
+    row.append(
+      info,
+      chips,
+      grantControls(email, heldByUser.get(String(id)) || new Set()),
+    );
     return row;
   };
   body.innerHTML = "";
@@ -5215,7 +5719,10 @@ async function renderAdminUsers(body) {
         revoke.className = "memory-del";
         revoke.textContent = "×";
         revoke.title = "Revoke";
-        revoke.setAttribute("aria-label", `Revoke ${entry.badge} from ${entry.email}`);
+        revoke.setAttribute(
+          "aria-label",
+          `Revoke ${entry.badge} from ${entry.email}`,
+        );
         revoke.addEventListener("click", async () => {
           await adminFetch("/admin/badges", {
             method: "DELETE",
@@ -5228,7 +5735,8 @@ async function renderAdminUsers(body) {
         badgeList.appendChild(row);
       });
       if (!all.badges?.length) {
-        badgeList.innerHTML = '<div class="admin-log-item"><time>-</time>No badges granted yet.</div>';
+        badgeList.innerHTML =
+          '<div class="admin-log-item"><time>-</time>No badges granted yet.</div>';
       }
     } catch (error) {
       badgeList.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
@@ -5240,7 +5748,10 @@ async function renderAdminUsers(body) {
       await adminFetch("/admin/badges", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailInput.value.trim(), badge: badgeSelect.value }),
+        body: JSON.stringify({
+          email: emailInput.value.trim(),
+          badge: badgeSelect.value,
+        }),
       });
       emailInput.value = "";
       refreshUsers();
@@ -5262,7 +5773,9 @@ async function renderAdminUsers(body) {
       <h3>Supabase auth</h3>
       <div class="admin-log-list">
         <div class="admin-log-item"><time>users</time>${
-          data.supabase_users ? `${data.supabase_users.length} listed` : "Unavailable (needs service key or migration)"
+          data.supabase_users
+            ? `${data.supabase_users.length} listed`
+            : "Unavailable (needs service key or migration)"
         }</div>
       </div>
       <div class="admin-log-list" id="adminSupabaseUsers"></div>
@@ -5281,12 +5794,18 @@ async function renderAdminUsers(body) {
     );
   });
   if (!data.demo_users?.length) {
-    list.innerHTML = '<div class="admin-log-item"><time>-</time>No demo accounts.</div>';
+    list.innerHTML =
+      '<div class="admin-log-item"><time>-</time>No demo accounts.</div>';
   }
   const supList = body.querySelector("#adminSupabaseUsers");
   (data.supabase_users || []).slice(0, 50).forEach((u) => {
     supList.appendChild(
-      userRow(u.id, u.email || u.id, String(u.created_at || "").slice(0, 10), u.email || u.id),
+      userRow(
+        u.id,
+        u.email || u.id,
+        String(u.created_at || "").slice(0, 10),
+        u.email || u.id,
+      ),
     );
   });
   if (!data.supabase_users?.length) {
@@ -5397,18 +5916,22 @@ async function renderAdminLogs(body) {
   body.appendChild(toolbar);
   const list = document.createElement("div");
   list.className = "admin-log-list";
-  (data.logs || []).slice().reverse().forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "admin-log-item";
-    const when = document.createElement("time");
-    when.textContent = (item.time || "").slice(11, 19) || item.time || "";
-    const txt = document.createElement("span");
-    txt.textContent = item.message || "";
-    row.append(when, txt);
-    list.appendChild(row);
-  });
+  (data.logs || [])
+    .slice()
+    .reverse()
+    .forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "admin-log-item";
+      const when = document.createElement("time");
+      when.textContent = (item.time || "").slice(11, 19) || item.time || "";
+      const txt = document.createElement("span");
+      txt.textContent = item.message || "";
+      row.append(when, txt);
+      list.appendChild(row);
+    });
   if (!data.logs?.length) {
-    list.innerHTML = '<div class="admin-log-item"><time>-</time>No logs yet.</div>';
+    list.innerHTML =
+      '<div class="admin-log-item"><time>-</time>No logs yet.</div>';
   }
   body.appendChild(list);
 }
@@ -5476,11 +5999,19 @@ async function renderAdminPatches(body) {
   try {
     const res = await apiFetch(`${apiBaseUrl}/admin/patches`);
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `Failed to load patches (${res.status})`);
+    if (!res.ok)
+      throw new Error(data.detail || `Failed to load patches (${res.status})`);
     const targets = data.targets || [];
     const patches = data.patches || [];
-    const targetOptions = targets.map((target) => `<option value="${adminEsc(target)}">${adminEsc(target)}</option>`).join("");
-    const cards = patches.map((patch) => `
+    const targetOptions = targets
+      .map(
+        (target) =>
+          `<option value="${adminEsc(target)}">${adminEsc(target)}</option>`,
+      )
+      .join("");
+    const cards = patches
+      .map(
+        (patch) => `
       <article class="patch-card" data-patch-card="${adminEsc(patch.id)}">
         <div class="patch-card-heading">
           <div><strong>${adminEsc(patch.target || "Source snapshot")}</strong><span class="patch-kind">${adminEsc(patch.kind || "snapshot")}</span></div>
@@ -5493,7 +6024,9 @@ async function renderAdminPatches(body) {
           <button type="button" class="patch-restore-btn" data-patch-restore="${adminEsc(patch.id)}">Restore snapshot</button>
         </div>
         <pre class="patch-diff" data-patch-diff hidden></pre>
-      </article>`).join("");
+      </article>`,
+      )
+      .join("");
 
     body.innerHTML = `
       <section class="patch-manager">
@@ -5507,12 +6040,16 @@ async function renderAdminPatches(body) {
         <div class="patch-list">${cards || `<div class="patch-empty"><strong>No patches yet</strong><span>Capture a source file to start a version history.</span></div>`}</div>
       </section>`;
 
-    body.querySelector("#patchCaptureForm")?.addEventListener("submit", recordPatchSnapshot);
+    body
+      .querySelector("#patchCaptureForm")
+      ?.addEventListener("submit", recordPatchSnapshot);
     body.querySelectorAll("[data-patch-preview]").forEach((button) => {
       button.addEventListener("click", () => previewPatch(button));
     });
     body.querySelectorAll("[data-patch-restore]").forEach((button) => {
-      button.addEventListener("click", () => handleRestorePatch(button.dataset.patchRestore));
+      button.addEventListener("click", () =>
+        handleRestorePatch(button.dataset.patchRestore),
+      );
     });
   } catch (error) {
     body.innerHTML = `<div class="admin-log-item"><time>error</time>${adminEsc(error.message)}</div>`;
@@ -5532,9 +6069,12 @@ async function previewPatch(button) {
   button.disabled = true;
   button.textContent = "Loading diff...";
   try {
-    const res = await apiFetch(`${apiBaseUrl}/admin/patches/${encodeURIComponent(patchId)}/preview`);
+    const res = await apiFetch(
+      `${apiBaseUrl}/admin/patches/${encodeURIComponent(patchId)}/preview`,
+    );
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || `Failed to preview patch (${res.status})`);
+    if (!res.ok)
+      throw new Error(data.detail || `Failed to preview patch (${res.status})`);
     output.textContent = data.diff || "No differences from the current file.";
     output.hidden = false;
     button.setAttribute("aria-expanded", "true");
@@ -5548,13 +6088,24 @@ async function previewPatch(button) {
 }
 
 async function handleRestorePatch(patchId) {
-  if (!confirm("Restore this saved source file? Nico will first save the current version as a backup.")) return;
+  if (
+    !confirm(
+      "Restore this saved source file? Nico will first save the current version as a backup.",
+    )
+  )
+    return;
   try {
-    const res = await apiFetch(`${apiBaseUrl}/admin/patches/${encodeURIComponent(patchId)}/restore`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirm: true, note: "Restored from Developer Dashboard" }),
-    });
+    const res = await apiFetch(
+      `${apiBaseUrl}/admin/patches/${encodeURIComponent(patchId)}/restore`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirm: true,
+          note: "Restored from Developer Dashboard",
+        }),
+      },
+    );
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Restore failed");
     showComposerToast(`Restored. Backup ${data.backup_id} was saved.`);
@@ -5575,8 +6126,11 @@ async function recordPatchSnapshot(event) {
   submit.disabled = true;
   submit.textContent = "Capturing...";
   try {
-    const fileResponse = await fetch(new URL(target, window.location.href), { cache: "no-store" });
-    if (!fileResponse.ok) throw new Error(`Cannot read ${target} from this web build.`);
+    const fileResponse = await fetch(new URL(target, window.location.href), {
+      cache: "no-store",
+    });
+    if (!fileResponse.ok)
+      throw new Error(`Cannot read ${target} from this web build.`);
     const content = await fileResponse.text();
     const res = await apiFetch(`${apiBaseUrl}/admin/patches`, {
       method: "POST",

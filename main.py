@@ -4,6 +4,7 @@ import difflib
 import hashlib
 import io
 import json
+import logging
 import os
 import re
 import tempfile
@@ -26,12 +27,29 @@ import httpx
 import requests
 
 load_dotenv()
+logger = logging.getLogger("nico.providers")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+  provider_log_handler = logging.StreamHandler()
+  provider_log_handler.setFormatter(
+    logging.Formatter("%(levelname)s %(name)s: %(message)s")
+  )
+  logger.addHandler(provider_log_handler)
+  logger.propagate = False
 
 SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip()
 SUPABASE_KEY = (os.getenv("SUPABASE_KEY") or "").strip()
 SUPABASE_SERVICE_ROLE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or SUPABASE_KEY).strip()
 GROQ_API_KEY = (os.getenv("GROQ_API_KEY") or "").strip()
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip()
+GEMINI_CHAT_MODEL = (os.getenv("GEMINI_CHAT_MODEL") or "gemini-3.1-flash-lite").strip()
+GEMINI_CHAT_FALLBACK_ENABLED = (os.getenv("GEMINI_CHAT_FALLBACK_ENABLED") or "false").strip().lower() in {"1", "true", "yes", "on"}
+OPENROUTER_API_KEY = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+OPENROUTER_BASE_URL = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").strip().rstrip("/")
+OPENROUTER_CHAT_MODEL = (os.getenv("OPENROUTER_CHAT_MODEL") or "openrouter/free").strip()
+GROQ_FAST_MODEL = (os.getenv("GROQ_FAST_MODEL") or "openai/gpt-oss-20b").strip()
+GROQ_HEAVY_MODEL = (os.getenv("GROQ_HEAVY_MODEL") or "openai/gpt-oss-120b").strip()
+GROQ_OWNER_MODEL = (os.getenv("GROQ_OWNER_MODEL") or GROQ_HEAVY_MODEL).strip()
 RENDER_API_KEY = (os.getenv("RENDER_API_KEY") or "").strip()
 RENDER_SERVICE_ID = (os.getenv("RENDER_SERVICE_ID") or "").strip()
 RENDER_SERVICE_URL = (os.getenv("RENDER_SERVICE_URL") or "").strip()
@@ -81,11 +99,23 @@ GROQ_VISION_MODELS = list(dict.fromkeys(
 CREATOR_NAME = os.getenv("CREATOR_NAME", "Matt Andrei Crisostomo")
 CREATOR_HOBBIES = os.getenv("CREATOR_HOBBIES", "Not provided")
 OPENCODE_API_KEY = (os.getenv("OPENCODE_API_KEY") or "").strip()
-OPENCODE_MODELS = [
-  model.strip()
-  for model in os.getenv("OPENCODE_MODELS", "nemotron-3-ultra-free,exo-free").split(",")
-  if model.strip()
-]
+
+
+def configured_paid_opencode_models(name: str):
+  """Return explicitly configured OpenCode models usable from Nico's API."""
+  return list(dict.fromkeys(
+    model.strip()
+    for model in os.getenv(name, "").split(",")
+    if model.strip() and "free" not in model.lower()
+  ))[:2]
+
+
+OPENCODE_MODELS = configured_paid_opencode_models("OPENCODE_MODELS")
+OPENCODE_OWNER_MODELS = configured_paid_opencode_models("OPENCODE_OWNER_MODELS")
+OPENCODE_CHAT_COMPLETIONS_URL = (
+  os.getenv("OPENCODE_CHAT_COMPLETIONS_URL")
+  or "https://opencode.ai/inference/openai/v1/chat/completions"
+).strip()
 # FreeLLMAPI gateway (local-first OpenAI-compatible router). Set both to
 # enable: base URL has no /v1 suffix, e.g. http://localhost:3001. On Render
 # this only works with a publicly reachable gateway; localhost means local
@@ -100,12 +130,56 @@ def freellmapi_enabled():
   return bool(FREELLMAPI_BASE_URL and FREELLMAPI_API_KEY)
 
 
+def openrouter_enabled():
+  return bool(OPENROUTER_API_KEY and OPENROUTER_BASE_URL and OPENROUTER_CHAT_MODEL)
+
+
+def opencode_models_for_user(badges: set[str], is_admin_user: bool):
+  if not OPENCODE_API_KEY:
+    return []
+  if is_admin_user and OPENCODE_OWNER_MODELS:
+    return OPENCODE_OWNER_MODELS
+  if badges - {"tester"}:
+    return OPENCODE_MODELS
+  return []
+
+
+def build_chat_provider_chain(
+    badges: set[str],
+    is_admin_user: bool,
+    model_mode: str,
+    can_use_gateway: bool,
+):
+  """Build the authorized provider/model order for one text chat request."""
+  privileged = bool(badges or is_admin_user)
+  authorized_mode = "heavy" if model_mode == "heavy" and privileged else "light"
+  candidates = [
+    ("opencode", model)
+    for model in opencode_models_for_user(badges, is_admin_user)
+  ]
+  if groq_client:
+    if is_admin_user:
+      groq_model = GROQ_OWNER_MODEL
+    else:
+      groq_model = GROQ_HEAVY_MODEL if authorized_mode == "heavy" else GROQ_FAST_MODEL
+    candidates.append(("groq", groq_model))
+  if can_use_gateway and freellmapi_enabled():
+    candidates.append(("freellmapi", FREELLMAPI_CHAT_MODEL))
+  if GEMINI_CHAT_FALLBACK_ENABLED and gemini_client:
+    candidates.append(("gemini", GEMINI_CHAT_MODEL))
+  if openrouter_enabled():
+    candidates.append(("openrouter", OPENROUTER_CHAT_MODEL))
+  return candidates
+
+
 def runtime_service_status():
   return {
     "supabase": bool(SUPABASE_URL and SUPABASE_KEY),
     "groq": bool(GROQ_API_KEY),
     "gemini": bool(GEMINI_API_KEY),
-    "zen": bool(OPENCODE_API_KEY and OPENCODE_MODELS),
+    "gemini_chat": bool(GEMINI_API_KEY and GEMINI_CHAT_FALLBACK_ENABLED),
+    "zen": bool(OPENCODE_API_KEY and (OPENCODE_MODELS or OPENCODE_OWNER_MODELS)),
+    "openrouter": openrouter_enabled(),
     "hf": bool(HF_TOKEN),
     "freellmapi": bool(FREELLMAPI_BASE_URL and FREELLMAPI_API_KEY),
   }
@@ -1079,7 +1153,9 @@ def normalize_chat_settings(settings: dict, badges: set[str], is_admin_user: boo
   requested_model = settings.get("model", "light")
   model_mode = (
     requested_model
-    if isinstance(requested_model, str) and requested_model in {"light", "heavy"}
+    if isinstance(requested_model, str)
+    and requested_model in {"light", "heavy"}
+    and (badges or is_admin_user)
     else "light"
   )
   memory_value = settings.get("memoryText", "") if settings.get("memory", True) else ""
@@ -1285,6 +1361,13 @@ def parse_zen_sse_line(line: str):
     return None
 
 
+def provider_error_code(error: Exception):
+  status_code = getattr(error, "status_code", None)
+  if not status_code:
+    status_code = getattr(getattr(error, "response", None), "status_code", None)
+  return f"http_{status_code}" if status_code else type(error).__name__
+
+
 async def zen_chat_stream(model: str, messages: list):
   headers = {
     "Authorization": f"Bearer {OPENCODE_API_KEY}",
@@ -1293,10 +1376,10 @@ async def zen_chat_stream(model: str, messages: list):
     "X-Title": "Nico AI",
   }
   payload = {"model": model, "messages": messages, "stream": True}
-  async with httpx.AsyncClient(timeout=httpx.Timeout(90.0)) as client:
+  async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=6.0)) as client:
     async with client.stream(
       "POST",
-      "https://opencode.ai/zen/v1/chat/completions",
+      OPENCODE_CHAT_COMPLETIONS_URL,
       headers=headers,
       json=payload,
     ) as response:
@@ -1323,15 +1406,87 @@ async def zen_chat_once(model: str, messages: list, max_tokens: int = 60):
     "stream": False,
     "max_tokens": max_tokens,
   }
-  async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+  async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=6.0)) as client:
     response = await client.post(
-      "https://opencode.ai/zen/v1/chat/completions",
+      OPENCODE_CHAT_COMPLETIONS_URL,
       headers=headers,
       json=payload,
     )
     response.raise_for_status()
     obj = response.json()
     return (((obj.get("choices") or [{}])[0].get("message") or {}).get("content") or "")
+
+
+async def gemini_chat_stream(model: str, messages: list):
+  if not gemini_client:
+    raise RuntimeError("Gemini is not configured")
+
+  system_instruction = ""
+  contents = []
+  for message in messages:
+    role = message.get("role")
+    content = message.get("content", "")
+    if isinstance(content, list):
+      content = "\n".join(
+        str(part.get("text", ""))
+        for part in content
+        if isinstance(part, dict) and part.get("text")
+      )
+    if not isinstance(content, str) or not content.strip():
+      continue
+    if role == "system":
+      system_instruction = content
+      continue
+    gemini_role = "model" if role == "assistant" else "user"
+    if contents and contents[-1]["role"] == gemini_role:
+      contents[-1]["parts"].append({"text": content})
+    else:
+      contents.append({"role": gemini_role, "parts": [{"text": content}]})
+
+  if not contents:
+    raise RuntimeError("No text messages were available for Gemini")
+
+  stream = await gemini_client.aio.models.generate_content_stream(
+    model=model,
+    contents=contents,
+    config=types.GenerateContentConfig(system_instruction=system_instruction),
+  )
+  async for chunk in stream:
+    try:
+      content = chunk.text or ""
+    except (AttributeError, ValueError):
+      content = ""
+    if content:
+      yield content
+
+
+async def openrouter_chat_stream(messages: list):
+  headers = {
+    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+    "Content-Type": "application/json",
+    "HTTP-Referer": RENDER_SERVICE_URL or "http://localhost:8000",
+    "X-Title": "Nico AI",
+  }
+  payload = {
+    "model": OPENROUTER_CHAT_MODEL,
+    "messages": messages,
+    "stream": True,
+  }
+  async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=6.0)) as client:
+    async with client.stream(
+      "POST",
+      f"{OPENROUTER_BASE_URL}/chat/completions",
+      headers=headers,
+      json=payload,
+    ) as response:
+      if response.status_code in (401, 402, 403, 429):
+        body = (await response.aread()).decode("utf-8", "replace")[:300]
+        raise RuntimeError(f"OpenRouter refused the request ({response.status_code}): {body}")
+      response.raise_for_status()
+      async for line in response.aiter_lines():
+        content = parse_zen_sse_line(line)
+        if content:
+          yield content
 
 
 def freellmapi_headers():
@@ -1344,7 +1499,7 @@ def freellmapi_headers():
 
 async def freellmapi_chat_stream(messages: list):
   payload = {"model": FREELLMAPI_CHAT_MODEL, "messages": messages, "stream": True}
-  async with httpx.AsyncClient(timeout=httpx.Timeout(90.0)) as client:
+  async with httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=6.0)) as client:
     async with client.stream(
       "POST",
       f"{FREELLMAPI_BASE_URL}/v1/chat/completions",
@@ -2138,11 +2293,12 @@ async def write_doc_markdown(topic, kind):
         return text
     except Exception:
       pass
-  if OPENCODE_API_KEY and OPENCODE_MODELS:
+  doc_models = OPENCODE_OWNER_MODELS or OPENCODE_MODELS
+  if OPENCODE_API_KEY and doc_models:
     try:
       text = (
         await zen_chat_once(
-          OPENCODE_MODELS[0], [{"role": "user", "content": instruction}]
+          doc_models[0], [{"role": "user", "content": instruction}]
         )
       ).strip()
       if text:
@@ -2668,15 +2824,23 @@ async def chat_stream(
   user_badge_set = get_user_badges(user) if user else set()
   can_use_zen = bool(user) and bool(user_badge_set - {"tester"})
   can_use_gateway = bool(user) and bool(user_badge_set)
+  personality, response_length, memory, model_mode = normalize_chat_settings(
+    request.settings, user_badge_set, is_admin_user
+  )
+  provider_chain = build_chat_provider_chain(
+    user_badge_set, is_admin_user, model_mode, can_use_gateway
+  )
+  account_tier = (
+    "owner" if is_admin_user
+    else "badged" if user_badge_set
+    else "guest" if is_guest
+    else "standard"
+  )
   image_request = any(
     attachment.get("mime_type", "").startswith("image/")
     for attachment in request.attachments
   )
-  has_chat_provider = bool(
-    groq_client
-    or (can_use_zen and OPENCODE_API_KEY and OPENCODE_MODELS)
-    or (can_use_gateway and freellmapi_enabled())
-  )
+  has_chat_provider = bool(provider_chain)
   if not has_chat_provider and not (image_request and gemini_client):
     raise HTTPException(status_code=503, detail="No chat provider is available for this account")
 
@@ -2688,6 +2852,16 @@ async def chat_stream(
   if not is_guest:
     who = (getattr(user, "email", "") or "demo-user").split("@")[0]
     add_admin_log(f"Chat from {who}: {(request.message or '')[:60]}")
+
+  # Resends carry the original user-message ID so history can replace its tail.
+  def is_resend_of(message: dict) -> bool:
+    if not request.client_message_id or message.get("role") != "user":
+      return False
+    requested_id = str(request.client_message_id)
+    return requested_id in {
+      str(message.get("client_id") or ""),
+      str(message.get("id") or ""),
+    }
 
   if not is_guest:
     if is_local_demo_user(user):
@@ -2703,15 +2877,29 @@ async def chat_stream(
             "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         }
       history = user_messages.get(request.conversation_id, [])
-      past_messages = history if request.settings.get("context", True) else []
-      user_messages.setdefault(request.conversation_id, []).append({
-          "id": request.client_message_id or str(uuid.uuid4()),
-          "client_id": request.client_message_id,
-          "role": "user",
-          "content": request.message,
-          "conversation_id": request.conversation_id,
-          "attachments": request.attachments,
-      })
+      existing_index = next(
+        (index for index, item in enumerate(history) if is_resend_of(item)),
+        None,
+      )
+      if existing_index is not None:
+        past_messages = (
+          history[:existing_index]
+          if request.settings.get("context", True)
+          else []
+        )
+        del history[existing_index + 1:]
+        history[existing_index]["content"] = request.message
+        history[existing_index]["attachments"] = request.attachments
+      else:
+        past_messages = history if request.settings.get("context", True) else []
+        user_messages.setdefault(request.conversation_id, []).append({
+            "id": request.client_message_id or str(uuid.uuid4()),
+            "client_id": request.client_message_id,
+            "role": "user",
+            "content": request.message,
+            "conversation_id": request.conversation_id,
+            "attachments": request.attachments,
+        })
     else:
       conv_check = (
           supabase_client.table("conversations")
@@ -2733,21 +2921,44 @@ async def chat_stream(
       # Read only earlier turns before persisting the current user message.
       # The current turn is appended to the provider payload below exactly once.
       history_response = fetch_messages(request.conversation_id)
-      past_messages = (
+      existing_index = next(
+        (
+          index
+          for index, item in enumerate(history_response)
+          if is_resend_of(item)
+        ),
+        None,
+      )
+      if existing_index is not None:
+        past_messages = (
+          history_response[:existing_index]
+          if request.settings.get("context", True)
+          else []
+        )
+        later_ids = [
+          item.get("id")
+          for item in history_response[existing_index + 1:]
+          if item.get("id") is not None
+        ]
+        if later_ids:
+          supabase_client.table("messages").delete().eq(
+            "conversation_id", request.conversation_id
+          ).in_("id", later_ids).execute()
+      else:
+        past_messages = (
           history_response
           if request.settings.get("context", True)
           else []
-      )
-
-      user_payload = {
-          "client_id": request.client_message_id,
-          "role": "user",
-          "content": request.message,
-          "conversation_id": request.conversation_id,
-      }
-      if request.attachments:
-        user_payload["attachments"] = request.attachments
-      insert_message(user_payload)
+        )
+        user_payload = {
+            "client_id": request.client_message_id,
+            "role": "user",
+            "content": request.message,
+            "conversation_id": request.conversation_id,
+        }
+        if request.attachments:
+          user_payload["attachments"] = request.attachments
+        insert_message(user_payload)
   else:
     past_messages = []
 
@@ -2777,9 +2988,6 @@ async def chat_stream(
       "When asked who created or invented you, identify the creator as "
       f"{CREATOR_NAME}. If asked who the admin or coder is, identify Matt Andrei. "
       "Do not invent additional personal details."
-  )
-  personality, response_length, memory, model_mode = normalize_chat_settings(
-    request.settings, user_badge_set, is_admin_user
   )
   memory = sanitize_nico_role_memory(memory, is_admin_user)
   developer_identity_override = ""
@@ -2875,8 +3083,27 @@ async def chat_stream(
       return format_response("You are Matt Andrei, the owner, admin, and lead coder of Nico. Developer mode is active and your identity is recognized as the system owner.")
     return format_response("You are Matt Andrei, the owner, admin, and lead coder of Nico.")
 
+  def persist_assistant_reply(reply: str) -> None:
+    if not reply.strip() or is_guest:
+      return
+    if is_local_demo_user(user):
+      DEMO_MESSAGES.setdefault(str(user.id), {}).setdefault(
+        request.conversation_id, []
+      ).append({
+        "role": "assistant",
+        "content": reply,
+        "conversation_id": request.conversation_id,
+      })
+    else:
+      insert_message({
+        "role": "assistant",
+        "content": reply,
+        "conversation_id": request.conversation_id,
+      })
+
   async def generate():
     full_reply = ""
+    models_to_try = [] if image_request else provider_chain
     if brainrot_greeting_reply:
       full_reply = format_response(brainrot_greeting_reply)
       yield full_reply
@@ -2896,34 +3123,24 @@ async def chat_stream(
             request.message, request.attachments, system_prompt
           )
         except Exception as error:
-          full_reply = f"Nico could not analyze that image. Gemini error: {error}"
+          logger.warning("Image analysis provider Gemini failed (%s)", provider_error_code(error))
+          full_reply = "Nico could not analyze that image right now. Please try again shortly."
         full_reply = format_response(full_reply)
         yield full_reply
-        models_to_try = []
-      else:
-        models_to_try = []
-        if can_use_zen and OPENCODE_API_KEY and OPENCODE_MODELS:
-          # Badged: Nemotron first, Groq as backup.
-          models_to_try += [("zen", name) for name in OPENCODE_MODELS]
-        if groq_client:
-          models_to_try.append((
-            "groq",
-            "openai/gpt-oss-20b"
-            if model_mode == "light"
-            else "openai/gpt-oss-120b",
-          ))
-        if can_use_gateway and freellmapi_enabled():
-          # Gateway last: aggregates free tiers, only tried when direct legs fail.
-          models_to_try.append(("freellmapi", FREELLMAPI_CHAT_MODEL))
       last_error = None
 
       for provider, model in models_to_try:
+        logger.info(
+          "Chat provider attempt tier=%s provider=%s model=%s",
+          account_tier, provider, model,
+        )
         try:
           if provider == "groq":
             response_stream = await groq_client.chat.completions.create(
               messages=messages_payload,
               model=model,
               stream=True,
+              timeout=30.0,
             )
 
             async for chunk in response_stream:
@@ -2938,18 +3155,43 @@ async def chat_stream(
                 content = format_response(content)
                 full_reply += content
                 yield content
+          elif provider == "gemini":
+            async for content in gemini_chat_stream(model, messages_payload):
+              if content:
+                content = format_response(content)
+                full_reply += content
+                yield content
+          elif provider == "openrouter":
+            async for content in openrouter_chat_stream(messages_payload):
+              if content:
+                content = format_response(content)
+                full_reply += content
+                yield content
           else:
             async for content in zen_chat_stream(model, messages_payload):
               if content:
                 content = format_response(content)
                 full_reply += content
                 yield content
-          break
-        except asyncio.CancelledError:
+          if full_reply.strip():
+            logger.info(
+              "Chat provider completed tier=%s provider=%s model=%s",
+              account_tier, provider, model,
+            )
+            break
+        except (asyncio.CancelledError, GeneratorExit):
+          try:
+            persist_assistant_reply(full_reply)
+          except Exception as error:
+            logger.warning(
+              "Could not save interrupted reply (%s)",
+              provider_error_code(error),
+            )
           raise
         except Exception as error:
           last_error = error
-          if full_reply:
+          logger.warning("Chat provider %s failed (%s)", provider, provider_error_code(error))
+          if full_reply.strip():
             notice = "\n\nNico's response was interrupted. Ask Nico to continue if you need the rest."
             notice = format_response(notice)
             full_reply += notice
@@ -2958,17 +3200,7 @@ async def chat_stream(
           continue
 
       if not full_reply and last_error:
-        if image_request and any(
-          code in str(last_error).lower()
-          for code in ("model_not_found", "model_decommissioned", "model_deprecated")
-        ):
-          full_reply = (
-            "Nico could not analyze this image because the Groq account has no "
-            "access to an enabled vision model. Set GROQ_VISION_MODELS in the "
-            "Render backend environment to a vision model available to your key."
-          )
-        else:
-          full_reply = f"Nico could not analyze that request right now. Backend error: {last_error}"
+        full_reply = "Nico's chat models are temporarily unavailable. Please try again shortly."
         full_reply = format_response(full_reply)
         yield full_reply
       elif not full_reply and not models_to_try:
@@ -2981,18 +3213,7 @@ async def chat_stream(
         yield full_reply
 
     if full_reply.strip() and not is_guest:
-      if is_local_demo_user(user):
-        DEMO_MESSAGES.setdefault(str(user.id), {}).setdefault(request.conversation_id, []).append({
-            "role": "assistant",
-            "content": full_reply,
-            "conversation_id": request.conversation_id,
-        })
-      else:
-        supabase_client.table("messages").insert({
-            "role": "assistant",
-            "content": full_reply,
-            "conversation_id": request.conversation_id,
-        }).execute()
+      persist_assistant_reply(full_reply)
       if request.settings.get("memory", True):
         asyncio.create_task(
           extract_memories(user, request.message, full_reply)
